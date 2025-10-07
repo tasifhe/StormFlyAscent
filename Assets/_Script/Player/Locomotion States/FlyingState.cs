@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class FlyingState : State
 {
+    private DynamicJoystick joystick;
     private float flapTimer;
     private bool isFlapping;
 
@@ -17,29 +18,58 @@ public class FlyingState : State
         character.playerVelocity = Vector3.zero;
         flapTimer = 0f;
         isFlapping = false;
+
+        // Find joystick in scene
+        joystick = UnityEngine.Object.FindFirstObjectByType<DynamicJoystick>();
     }
 
     public override void HandleInput()
     {
         base.HandleInput();
+
+        // Joystick input for mobile
+        if (joystick != null)
+        {
+            // Horizontal input for turning
+            character.inputDirection = new Vector3(joystick.Horizontal, 0f, joystick.Vertical).normalized;
+        }
+        else
+        {
+            // Fallback to keyboard for testing
+            float horizontal = Input.GetAxis("Horizontal");
+            float vertical = Input.GetAxis("Vertical");
+            character.inputDirection = new Vector3(horizontal, 0f, vertical).normalized;
+        }
+
+        // Flap input - check for joystick movement or button press
+        bool shouldFlap = false;
         
-        // Get input direction for turning
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
-        character.inputDirection = new Vector3(horizontal, 0f, vertical).normalized;
+        if (joystick != null)
+        {
+            // Flap when joystick is moved up strongly
+            if (joystick.Vertical > 0.7f && !isFlapping)
+            {
+                shouldFlap = true;
+            }
+        }
         
-        // Flap input (space or jump button)
-        if (Input.GetButtonDown("Jump") && !isFlapping)
+        // Fallback keyboard input
+        if (Input.GetButtonDown("Jump"))
+        {
+            shouldFlap = true;
+        }
+        
+        if (shouldFlap)
         {
             isFlapping = true;
-            flapTimer = 0.2f; // Flap duration
+            flapTimer = 0.3f; // Flap duration
         }
     }
 
     public override void LogicUpdate()
     {
         base.LogicUpdate();
-        
+
         if (isFlapping)
         {
             flapTimer -= Time.deltaTime;
@@ -53,76 +83,76 @@ public class FlyingState : State
     public override void ChangeState()
     {
         base.ChangeState();
-        
-        // Transition to gliding if no input and moving downward
-        if (!isFlapping && character.playerVelocity.y < -1f && !Input.GetButton("Jump"))
-        {
-            stateMachine.ChangeState(character.glidingState);
-        }
-        
-        // Transition to diving if down input
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
-        {
-            stateMachine.ChangeState(character.divingState);
-        }
-        
-        // Check for ground collision to land
-        if (character.isGrounded && character.playerVelocity.y <= 0f)
-        {
-            stateMachine.ChangeState(character.standingState);
-        }
+
+        // For now, just stay in flying state
+        // Add other state transitions here when needed
+        // Example: transition to crash state if hit obstacle
+        // Example: transition to landing state when touching ground
     }
 
     public override void PhysicsUpdate()
     {
         base.PhysicsUpdate();
-        
+
+        // Calculate desired velocity
+        Vector3 velocity = character.rb.linearVelocity;
+
         // Apply wing flap force
         if (isFlapping)
         {
-            character.playerVelocity.y = character.flapStrength;
+            velocity.y = character.flapStrength;
         }
         else
         {
             // Apply gravity with some lift
-            character.playerVelocity.y += character.gravityValue * Time.fixedDeltaTime;
-            character.playerVelocity.y += character.liftForce * Time.fixedDeltaTime;
+            velocity.y += character.gravityValue * Time.fixedDeltaTime;
+            velocity.y += character.liftForce * Time.fixedDeltaTime;
         }
-        
+
         // Apply air resistance
-        character.playerVelocity *= character.airResistance;
+        velocity *= character.airResistance;
+
+        // Always move forward (endless runner style)
+        velocity += character.transform.forward * character.glideSpeed * Time.fixedDeltaTime;
         
-        // Handle turning
+        // Handle turning based on joystick input
         if (character.inputDirection != Vector3.zero)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(character.inputDirection);
-            character.transform.rotation = Quaternion.Slerp(character.transform.rotation, targetRotation, character.turnSpeed * Time.fixedDeltaTime);
-            
-            // Add forward momentum
-            character.playerVelocity += character.transform.forward * character.glideSpeed * Time.fixedDeltaTime;
+            // Turn left/right based on horizontal input
+            if (Mathf.Abs(character.inputDirection.x) > 0.1f)
+            {
+                // Smooth rotation for mobile
+                float turnAmount = character.inputDirection.x * character.turnSpeed * 30f * Time.fixedDeltaTime;
+                character.transform.Rotate(Vector3.up, turnAmount);
+            }
         }
-        
-        // Move the character
-        character.controller.Move(character.playerVelocity * Time.fixedDeltaTime);
-        
-        // Check ground
-        character.isGrounded = character.controller.isGrounded;
+
+        // Set the velocity
+        character.rb.linearVelocity = velocity;
+
+        // Check ground (simple check)
+        character.isGrounded = Physics.Raycast(character.transform.position, Vector3.down, 1.1f);
     }
 
-    public override void UpdateAnimation()
-    {
-        base.UpdateAnimation();
-        
-        if (character.animator != null)
-        {
-            character.animator.SetBool("IsFlying", true);
-            character.animator.SetBool("IsGliding", false);
-            character.animator.SetBool("IsDiving", false);
-            character.animator.SetBool("IsGrounded", false);
-            character.animator.SetBool("IsFlapping", isFlapping);
-            character.animator.SetFloat("VerticalSpeed", character.playerVelocity.y);
-        }
-    }
+    // public override void UpdateAnimation()
+    // {
+    //     base.UpdateAnimation();
+
+    //     if (character.animationManager != null)
+    //     {
+    //         // Play appropriate animation based on flying state
+    //         if (isFlapping)
+    //         {
+    //             // Play flapping animation with quick fade
+    //             character.animationManager.PlayFlapping();
+    //         }
+    //         else
+    //         {
+    //             // Play flying/gliding animation
+    //             character.animationManager.PlayFlying();
+    //         }
+    //     }
+    // }
 
     public override void Exit()
     {

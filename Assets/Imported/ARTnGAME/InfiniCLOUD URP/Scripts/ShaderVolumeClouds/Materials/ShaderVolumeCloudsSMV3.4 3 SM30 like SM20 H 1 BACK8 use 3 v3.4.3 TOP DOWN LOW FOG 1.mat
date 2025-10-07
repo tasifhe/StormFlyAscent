@@ -10,6 +10,8 @@ Material:
   m_Name: ShaderVolumeCloudsSMV3.4 3 SM30 like SM20 H 1 BACK8 use 3 v3.4.3 TOP DOWN
     LOW FOG 1
   m_Shader: {fileID: 4800000, guid: d46699f963e3e1a4fa975c3d0c795c75, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
   - CV_DEPTHBLEND_OFF
@@ -21,6 +23,7 @@ Material:
   m_CustomRenderQueue: 2800
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -122,9 +125,10 @@ Material:
     - _ShadowColor: {r: 0.53475434, g: 0.53475434, b: 0.5754717, a: 0}
     - _SunColor: {r: 0.9123354, g: 0.92995733, b: 0.9622642, a: 30.77255}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _Velocity1: {r: 4.7747197, g: -0.5411624, b: 0, a: 0.03735978}
-    - _Velocity2: {r: 18.68382, g: -0.45866808, b: 0, a: 0.07}
+    - _Velocity1: {r: 4.6898756, g: -0.5493151, b: 0, a: 0.036820322}
+    - _Velocity2: {r: 18.47447, g: -0.4669747, b: 0, a: 0.07}
     - _WindDirection: {r: 1, g: 0, b: 0, a: 0}
     - pointLightColor: {r: 1, g: 1, b: 1, a: 1}
     - pointLightPos: {r: -1655.3737, g: 690.0187, b: -1121.822, a: 0}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1
