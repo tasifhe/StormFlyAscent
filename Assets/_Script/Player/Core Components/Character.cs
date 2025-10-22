@@ -12,13 +12,11 @@ public class Character : MonoBehaviour
     [Space(10)]
 
     [Header("Flying Controls")]
-    public float flapStrength = 8f;
-    public float glideSpeed = 12f;
-    public float diveSpeed = 20f;
-    public float turnSpeed = 2f;
-    public float liftForce = 2f;
-    [Range(0, 1)]
-    public float airResistance = 0.98f;
+    public float forwardSpeed = 10f;          // Constant forward movement speed
+    public float moveSpeed = 5f;              // Lateral (left/right) movement sensitivity
+    public float diveForce = 15f;             // Strength of the dive
+    public float diveCooldown = 1.5f;         // Cooldown between dives
+    public float maxLateralDistance = 5f;     // Max distance bird can move left/right from center
 
     [Header("Animation Smoothing")]
     [Range(0, 1)]
@@ -43,7 +41,7 @@ public class Character : MonoBehaviour
     [HideInInspector]
     public Rigidbody rb;
     [HideInInspector]
-    //public BirdAnimationManager animationManager;
+    public BirdAnimationManager animationManager;
 
 
     private void Start()

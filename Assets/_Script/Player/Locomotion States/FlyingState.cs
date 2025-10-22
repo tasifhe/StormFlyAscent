@@ -1,10 +1,23 @@
 using UnityEngine;
 
+/// <summary>
+/// FlyingState - Handles the eagle's constant forward flight with gyroscopic steering and tap-to-dive mechanic
+/// </summary>
 public class FlyingState : State
 {
-    private DynamicJoystick joystick;
-    private float flapTimer;
-    private bool isFlapping;
+    // Input references
+    private DynamicJoystick joystick;           // For editor testing
+    private bool useGyroscope = false;           // Toggle for gyroscope vs joystick
+    private BirdPathFollower pathFollower;       // Reference to path follower
+    
+    // Dive mechanic variables
+    private bool isDiving = false;               // Currently performing a dive
+    private float diveTimer = 0f;                // Tracks dive duration
+    private float diveCooldownTimer = 0f;        // Tracks cooldown between dives
+    private const float DIVE_DURATION = 0.5f;    // How long the dive lasts
+    
+    // Movement tracking
+    private float currentLateralPosition = 0f;   // Track left/right position from center
 
     public FlyingState(Character _character, StateMachine _stateMachine) : base(_character, _stateMachine)
     {
@@ -15,148 +28,211 @@ public class FlyingState : State
     public override void Enter()
     {
         base.Enter();
-        character.playerVelocity = Vector3.zero;
-        flapTimer = 0f;
-        isFlapping = false;
+        
+        isDiving = false;
+        diveTimer = 0f;
+        diveCooldownTimer = 0f;
+        currentLateralPosition = character.transform.position.x;
 
-        // Find joystick in scene
+        // Get path follower reference
+        pathFollower = character.GetComponent<BirdPathFollower>();
+
+        // Find joystick for editor testing
         joystick = UnityEngine.Object.FindFirstObjectByType<DynamicJoystick>();
+        
+        // Check if gyroscope is available (mobile)
+        useGyroscope = SystemInfo.supportsGyroscope;
+        if (useGyroscope)
+        {
+            Input.gyro.enabled = true;
+            Debug.Log("Gyroscope enabled for steering");
+        }
+        else
+        {
+            Debug.Log("Gyroscope not available - using joystick/keyboard for testing");
+        }
     }
 
+    /// <summary>
+    /// Handle input detection - gyroscope tilt and tap-to-dive
+    /// Called in Update()
+    /// </summary>
     public override void HandleInput()
     {
         base.HandleInput();
 
-        // Joystick input for mobile
-        if (joystick != null)
+        // ===== GYROSCOPIC STEERING INPUT =====
+        if (useGyroscope)
         {
-            // Horizontal input for turning
-            character.inputDirection = new Vector3(joystick.Horizontal, 0f, joystick.Vertical).normalized;
+            // Get gyroscope tilt (X-axis rotation for left/right tilt)
+            float tilt = Input.gyro.rotationRateUnbiased.y; // Y rotation rate for left/right
+            character.inputDirection = new Vector3(tilt, 0f, 0f);
         }
         else
         {
-            // Fallback to keyboard for testing
-            float horizontal = Input.GetAxis("Horizontal");
-            float vertical = Input.GetAxis("Vertical");
-            character.inputDirection = new Vector3(horizontal, 0f, vertical).normalized;
-        }
-
-        // Flap input - check for joystick movement or button press
-        bool shouldFlap = false;
-        
-        if (joystick != null)
-        {
-            // Flap when joystick is moved up strongly
-            if (joystick.Vertical > 0.7f && !isFlapping)
+            // Editor/Testing fallback - use joystick or keyboard
+            if (joystick != null)
             {
-                shouldFlap = true;
+                character.inputDirection = new Vector3(joystick.Horizontal, 0f, 0f);
+            }
+            else
+            {
+                float horizontal = Input.GetAxis("Horizontal");
+                character.inputDirection = new Vector3(horizontal, 0f, 0f);
             }
         }
-        
-        // Fallback keyboard input
-        if (Input.GetButtonDown("Jump"))
+
+        // ===== TAP-TO-DIVE INPUT =====
+        DetectDiveInput();
+    }
+
+    /// <summary>
+    /// Detect tap input for dive mechanic
+    /// Supports both touch (mobile) and keyboard (testing)
+    /// </summary>
+    private void DetectDiveInput()
+    {
+        bool tapDetected = false;
+
+        // Mobile touch input
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
         {
-            shouldFlap = true;
+            tapDetected = true;
         }
         
-        if (shouldFlap)
+        // Editor testing - Space or Down arrow
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.DownArrow))
         {
-            isFlapping = true;
-            flapTimer = 0.3f; // Flap duration
+            tapDetected = true;
+        }
+
+        // Execute dive if tap detected and cooldown ready
+        if (tapDetected && diveCooldownTimer <= 0f && !isDiving)
+        {
+            StartDive();
         }
     }
 
+    /// <summary>
+    /// Initialize dive mechanic
+    /// </summary>
+    private void StartDive()
+    {
+        isDiving = true;
+        diveTimer = DIVE_DURATION;
+        diveCooldownTimer = character.diveCooldown;
+        
+        Debug.Log("Dive started!");
+    }
+
+    /// <summary>
+    /// Update timers and state logic
+    /// Called in Update()
+    /// </summary>
     public override void LogicUpdate()
     {
         base.LogicUpdate();
 
-        if (isFlapping)
+        // Update dive timer
+        if (isDiving)
         {
-            flapTimer -= Time.deltaTime;
-            if (flapTimer <= 0f)
+            diveTimer -= Time.deltaTime;
+            if (diveTimer <= 0f)
             {
-                isFlapping = false;
+                isDiving = false;
+                Debug.Log("Dive ended");
             }
+        }
+
+        // Update cooldown timer
+        if (diveCooldownTimer > 0f)
+        {
+            diveCooldownTimer -= Time.deltaTime;
         }
     }
 
     public override void ChangeState()
     {
         base.ChangeState();
-
-        // For now, just stay in flying state
-        // Add other state transitions here when needed
-        // Example: transition to crash state if hit obstacle
-        // Example: transition to landing state when touching ground
+        // Stay in flying state - add collision detection here if needed
     }
 
+    /// <summary>
+    /// Physics-based movement - constant forward flight, gyroscopic steering, and dive force
+    /// Called in FixedUpdate()
+    /// </summary>
     public override void PhysicsUpdate()
     {
         base.PhysicsUpdate();
 
-        // Calculate desired velocity
-        Vector3 velocity = character.rb.linearVelocity;
+        // Note: BirdPathFollower (Runner) controls forward movement along the path
+        // We only apply lateral steering forces and dive forces here
 
-        // Apply wing flap force
-        if (isFlapping)
+        // ===== GYROSCOPIC STEERING (LATERAL MOVEMENT) =====
+        // Apply left/right forces based on tilt/input
+        if (Mathf.Abs(character.inputDirection.x) > 0.05f)
         {
-            velocity.y = character.flapStrength;
+            // Apply lateral force (works with Runner's position control)
+            float lateralForce = character.inputDirection.x * character.moveSpeed * 10f;
+            character.rb.AddForce(Vector3.right * lateralForce, ForceMode.Force);
+            
+            // Update lateral position tracking for path follower
+            currentLateralPosition += character.inputDirection.x * character.moveSpeed * Time.fixedDeltaTime;
+            currentLateralPosition = Mathf.Clamp(currentLateralPosition, -character.maxLateralDistance, character.maxLateralDistance);
+            
+            // Update path follower lateral offset if available
+            if (pathFollower != null)
+            {
+                pathFollower.SetLateralOffset(currentLateralPosition);
+            }
         }
         else
         {
-            // Apply gravity with some lift
-            velocity.y += character.gravityValue * Time.fixedDeltaTime;
-            velocity.y += character.liftForce * Time.fixedDeltaTime;
+            // No input - dampen lateral velocity
+            Vector3 velocity = character.rb.linearVelocity;
+            Vector3 dampingForce = Vector3.right * -velocity.x * 5f;
+            character.rb.AddForce(dampingForce, ForceMode.Force);
         }
 
-        // Apply air resistance
-        velocity *= character.airResistance;
-
-        // Always move forward (endless runner style)
-        velocity += character.transform.forward * character.glideSpeed * Time.fixedDeltaTime;
-        
-        // Handle turning based on joystick input
-        if (character.inputDirection != Vector3.zero)
+        // ===== TAP-TO-DIVE MECHANIC =====
+        if (isDiving)
         {
-            // Turn left/right based on horizontal input
-            if (Mathf.Abs(character.inputDirection.x) > 0.1f)
-            {
-                // Smooth rotation for mobile
-                float turnAmount = character.inputDirection.x * character.turnSpeed * 30f * Time.fixedDeltaTime;
-                character.transform.Rotate(Vector3.up, turnAmount);
-            }
+            // Apply downward force for dive
+            character.rb.AddForce(Vector3.down * character.diveForce, ForceMode.Force);
         }
 
-        // Set the velocity
-        character.rb.linearVelocity = velocity;
-
-        // Check ground (simple check)
-        character.isGrounded = Physics.Raycast(character.transform.position, Vector3.down, 1.1f);
+        // Note: Rotation is handled by BirdPathFollower which aligns bird with path direction
     }
 
-    // public override void UpdateAnimation()
-    // {
-    //     base.UpdateAnimation();
+    /// <summary>
+    /// Update animations based on current state
+    /// </summary>
+    public override void UpdateAnimation()
+    {
+        base.UpdateAnimation();
 
-    //     if (character.animationManager != null)
-    //     {
-    //         // Play appropriate animation based on flying state
-    //         if (isFlapping)
-    //         {
-    //             // Play flapping animation with quick fade
-    //             character.animationManager.PlayFlapping();
-    //         }
-    //         else
-    //         {
-    //             // Play flying/gliding animation
-    //             character.animationManager.PlayFlying();
-    //         }
-    //     }
-    // }
+        if (character.animationManager != null)
+        {
+            if (isDiving)
+            {
+                character.animationManager.PlayDiving();
+            }
+            else
+            {
+                character.animationManager.PlayFlying();
+            }
+        }
+    }
 
     public override void Exit()
     {
         base.Exit();
-        isFlapping = false;
+        isDiving = false;
+        
+        // Disable gyroscope when exiting
+        if (useGyroscope)
+        {
+            Input.gyro.enabled = false;
+        }
     }
 }
