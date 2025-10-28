@@ -33,6 +33,14 @@ public class BirdPathFollower : Runner
     [Tooltip("Banking angle when steering left/right")]
     public float bankingAngle = 30f;
     
+    [Tooltip("How quickly banking responds to turns")]
+    [Range(1f, 20f)]
+    public float bankingSpeed = 8f;
+    
+    [Tooltip("Additional tilt when diving")]
+    [Range(0f, 45f)]
+    public float diveTiltAngle = 20f;
+    
     [Header("Debug")]
     public bool showDebugGizmos = true;
     public Color pathColor = Color.green;
@@ -41,8 +49,11 @@ public class BirdPathFollower : Runner
     // Private variables
     private Character character;
     private float currentBankAngle = 0f;
+    private float targetBankAngle = 0f;
     private float smoothedLateralOffset = 0f;
     private float targetLateralOffset = 0f;
+    private float previousLateralOffset = 0f;
+    private float lateralVelocity = 0f;
     
     protected override void Awake()
     {
@@ -98,8 +109,16 @@ public class BirdPathFollower : Runner
             followSpeed = character.forwardSpeed;
         }
         
-        // Smooth lateral offset
-        smoothedLateralOffset = Mathf.Lerp(smoothedLateralOffset, targetLateralOffset, Time.deltaTime * offsetSmoothSpeed);
+        // Smooth lateral offset with improved easing
+        smoothedLateralOffset = Mathf.SmoothDamp(smoothedLateralOffset, targetLateralOffset, ref lateralVelocity, 1f / offsetSmoothSpeed);
+        
+        // Calculate lateral velocity for banking (based on change in offset)
+        float offsetDelta = smoothedLateralOffset - previousLateralOffset;
+        previousLateralOffset = smoothedLateralOffset;
+        
+        // Update target bank angle based on turn rate (AC-style)
+        targetBankAngle = -offsetDelta * bankingSpeed * 50f; // Convert to angular velocity
+        targetBankAngle = Mathf.Clamp(targetBankAngle, -bankingAngle, bankingAngle);
     }
     
     protected override void FixedUpdate()
@@ -109,31 +128,33 @@ public class BirdPathFollower : Runner
     
     /// <summary>
     /// Override OnFollow to apply custom offsets and banking rotation
+    /// Enhanced with AC-style smooth banking and dive tilt
     /// </summary>
     protected override void OnFollow(SplineSample followResult)
     {
-        // Calculate banking angle first
-        float lateralVelocity = 0f;
-        if (character != null && character.rb != null)
+        // Smooth banking transition
+        currentBankAngle = Mathf.Lerp(currentBankAngle, targetBankAngle, Time.fixedDeltaTime * bankingSpeed);
+        
+        // Add pitch tilt when diving (check character state)
+        float pitchTilt = 0f;
+        if (character != null && character.flyingState != null)
         {
-            lateralVelocity = character.rb.linearVelocity.x;
+            // Access dive state from flying state if available
+            // For now, we'll detect diving by vertical velocity
+            if (character.rb != null && character.rb.linearVelocity.y < -3f)
+            {
+                pitchTilt = diveTiltAngle;
+            }
         }
-        
-        // Calculate target bank angle from lateral velocity
-        float targetBankAngle = -Mathf.Clamp(lateralVelocity * 2f, -bankingAngle, bankingAngle);
-        
-        // Smooth banking
-        currentBankAngle = Mathf.Lerp(currentBankAngle, targetBankAngle, Time.fixedDeltaTime * 5f);
         
         // Update motion offsets with smooth values
         _motion.offset = new Vector2(smoothedLateralOffset, heightOffset);
         
-        // Set rotation offset to include banking (roll on Z-axis)
-        // The banking is applied as a rotation offset so it works WITH the path rotation
-        _motion.rotationOffset = new Vector3(0f, 0f, currentBankAngle);
+        // Set rotation offset to include banking (roll) and pitch
+        // Z = roll (banking left/right), X = pitch (dive angle)
+        _motion.rotationOffset = new Vector3(pitchTilt, 0f, currentBankAngle);
         
         // Apply motion using Runner's system (handles smooth rotation automatically)
-        // This will align bird's Z-axis with path forward and apply banking
         base.OnFollow(followResult);
     }
     

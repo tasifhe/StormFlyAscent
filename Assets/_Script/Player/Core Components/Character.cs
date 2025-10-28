@@ -14,9 +14,38 @@ public class Character : MonoBehaviour
     [Header("Flying Controls")]
     public float forwardSpeed = 10f;          // Constant forward movement speed
     public float moveSpeed = 5f;              // Lateral (left/right) movement sensitivity
-    public float diveForce = 15f;             // Strength of the dive
-    public float diveCooldown = 1.5f;         // Cooldown between dives
+    public float verticalSpeed = 3f;          // Vertical (up/down) movement sensitivity
+    public float flapBoostForce = 20f;        // Speed boost when tapping to flap
+    public float flapBoostDuration = 0.3f;    // How long flap boost lasts
+    public float flapCooldown = 0.8f;         // Cooldown between flaps
     public float maxLateralDistance = 5f;     // Max distance bird can move left/right from center
+    public float maxVerticalOffset = 5f;      // Max distance bird can move up/down from path
+    
+    [Header("Flight Smoothness (AC-Style)")]
+    [Tooltip("How quickly input responds (lower = smoother, more momentum)")]
+    [Range(1f, 20f)]
+    public float inputResponsiveness = 8f;
+    [Tooltip("Speed boost multiplier when flapping")]
+    [Range(1f, 3f)]
+    public float flapSpeedMultiplier = 1.8f;
+    [Tooltip("Speed reduction multiplier when gliding")]
+    [Range(0.5f, 1f)]
+    public float glideSpeedMultiplier = 0.85f;
+    [Tooltip("How much altitude change affects speed")]
+    [Range(0f, 5f)]
+    public float altitudeSpeedInfluence = 1.5f;
+    [Tooltip("Drag coefficient for smooth deceleration")]
+    [Range(0f, 5f)]
+    public float airDrag = 1.2f;
+    [Tooltip("Maximum turn rate (degrees per second)")]
+    [Range(10f, 180f)]
+    public float maxTurnRate = 90f;
+    
+    [Header("Flight Animation Timing")]
+    [Tooltip("How long the bird actively flaps its wings before gliding")]
+    public float flyingDuration = 3f;
+    [Tooltip("How long the bird glides passively before flapping again")]
+    public float glidingDuration = 2f;
 
     [Header("Animation Smoothing")]
     [Range(0, 1)]

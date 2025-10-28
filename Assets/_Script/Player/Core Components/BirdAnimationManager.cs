@@ -30,9 +30,19 @@ public class BirdAnimationManager : MonoBehaviour
     [SerializeField] private float quickFadeDuration = 0.1f;
     [SerializeField] private float slowFadeDuration = 0.5f;
     
+    [Header("Speed-Based Animation")]
+    [Tooltip("Adjust animation speed based on bird velocity (AC-style)")]
+    [SerializeField] private bool useSpeedScaling = true;
+    [SerializeField] private float minAnimationSpeed = 0.8f;
+    [SerializeField] private float maxAnimationSpeed = 1.5f;
+    
     private AnimancerComponent animancer;
     private Animator animator;
     private AnimancerState currentState;
+    
+    // Speed tracking for animation
+    private Character character;
+    private float currentAnimationSpeed = 1f;
     
     // Animation state tracking
     public enum AnimationState
@@ -51,6 +61,7 @@ public class BirdAnimationManager : MonoBehaviour
         // Try to get both components
         animancer = GetComponent<AnimancerComponent>();
         animator = GetComponent<Animator>();
+        character = GetComponent<Character>();
         
         if (useAnimancer && animancer == null)
         {
@@ -79,6 +90,27 @@ public class BirdAnimationManager : MonoBehaviour
         }
     }
     
+    private void Update()
+    {
+        // Update animation speed based on bird velocity (AC-style)
+        if (useSpeedScaling && character != null && character.rb != null)
+        {
+            float speed = character.rb.linearVelocity.magnitude;
+            float normalizedSpeed = Mathf.InverseLerp(5f, 20f, speed); // Map speed range
+            currentAnimationSpeed = Mathf.Lerp(minAnimationSpeed, maxAnimationSpeed, normalizedSpeed);
+            
+            // Apply animation speed
+            if (useAnimancer && currentState != null)
+            {
+                currentState.Speed = currentAnimationSpeed;
+            }
+            else if (animator != null)
+            {
+                animator.speed = currentAnimationSpeed;
+            }
+        }
+    }
+    
     #region Public Animation Methods
     
     public void PlayFlying(float fadeDuration = -1f)
@@ -89,6 +121,7 @@ public class BirdAnimationManager : MonoBehaviour
         }
         else
         {
+            Debug.Log("PlayFlying called - Setting Animator parameters");
             SetAnimatorState("Flying", true);
             SetAnimatorState("Diving", false);
             SetAnimatorState("Gliding", false);
@@ -103,6 +136,7 @@ public class BirdAnimationManager : MonoBehaviour
         }
         else
         {
+            Debug.Log("PlayGliding called - Setting Animator parameters");
             SetAnimatorState("Flying", false);
             SetAnimatorState("Diving", false);
             SetAnimatorState("Gliding", true);
@@ -117,6 +151,7 @@ public class BirdAnimationManager : MonoBehaviour
         }
         else
         {
+            Debug.Log("PlayDiving called - Setting Animator parameters");
             SetAnimatorState("Flying", false);
             SetAnimatorState("Diving", true);
             SetAnimatorState("Gliding", false);
@@ -210,6 +245,11 @@ public class BirdAnimationManager : MonoBehaviour
         if (animator != null && animator.isActiveAndEnabled)
         {
             animator.SetBool(paramName, value);
+            Debug.Log($"Animator parameter set: {paramName} = {value}");
+        }
+        else
+        {
+            Debug.LogWarning($"Cannot set animator parameter {paramName} - Animator is null or inactive!");
         }
     }
     

@@ -1,23 +1,37 @@
 using UnityEngine;
 
 /// <summary>
-/// FlyingState - Handles the eagle's constant forward flight with gyroscopic steering and tap-to-dive mechanic
+/// FlyingState - AC-style bird flight with joystick (left/right, up/down) and tap-to-flap boost
 /// </summary>
 public class FlyingState : State
 {
     // Input references
-    private DynamicJoystick joystick;           // For editor testing
-    private bool useGyroscope = false;           // Toggle for gyroscope vs joystick
+    private DynamicJoystick joystick;           // For joystick input
     private BirdPathFollower pathFollower;       // Reference to path follower
     
-    // Dive mechanic variables
-    private bool isDiving = false;               // Currently performing a dive
-    private float diveTimer = 0f;                // Tracks dive duration
-    private float diveCooldownTimer = 0f;        // Tracks cooldown between dives
-    private const float DIVE_DURATION = 0.5f;    // How long the dive lasts
+    // Input smoothing for AC-style responsiveness
+    private Vector3 smoothedInput = Vector3.zero;
+    private Vector3 inputVelocity = Vector3.zero;
+    
+    // Speed management
+    private float currentSpeedMultiplier = 1f;
+    private float targetSpeedMultiplier = 1f;
+    private float previousAltitude = 0f;
+    
+    // Flap boost mechanic (replaces dive)
+    private bool isFlapBoosting = false;         // Currently boosting from flap
+    private float flapBoostTimer = 0f;           // Tracks boost duration
+    private float flapCooldownTimer = 0f;        // Tracks cooldown between flaps
+    
+    // Auto gliding mechanic variables
+    private bool isGliding = false;              // Currently in gliding phase
+    private float flightTimer = 0f;              // Tracks time in current flight phase
     
     // Movement tracking
     private float currentLateralPosition = 0f;   // Track left/right position from center
+    private float currentVerticalOffset = 0f;    // Track up/down position from path
+    private float lateralVelocity = 0f;          // Smooth lateral movement
+    private float verticalVelocity = 0f;         // Smooth vertical movement
 
     public FlyingState(Character _character, StateMachine _stateMachine) : base(_character, _stateMachine)
     {
@@ -29,100 +43,125 @@ public class FlyingState : State
     {
         base.Enter();
         
-        isDiving = false;
-        diveTimer = 0f;
-        diveCooldownTimer = 0f;
-        currentLateralPosition = character.transform.position.x;
+        isFlapBoosting = false;
+        flapBoostTimer = 0f;
+        flapCooldownTimer = 0f;
+        
+        // Start with active flying (flapping)
+        isGliding = false;
+        flightTimer = 0f;
+        
+        // Reset smooth values
+        smoothedInput = Vector3.zero;
+        inputVelocity = Vector3.zero;
+        currentSpeedMultiplier = 1f;
+        targetSpeedMultiplier = 1f;
+        lateralVelocity = 0f;
+        verticalVelocity = 0f;
+        
+        currentLateralPosition = 0f;
+        currentVerticalOffset = 0f;
+        previousAltitude = character.transform.position.y;
 
         // Get path follower reference
         pathFollower = character.GetComponent<BirdPathFollower>();
 
-        // Find joystick for editor testing
+        // Find joystick
         joystick = UnityEngine.Object.FindFirstObjectByType<DynamicJoystick>();
         
-        // Check if gyroscope is available (mobile)
-        useGyroscope = SystemInfo.supportsGyroscope;
-        if (useGyroscope)
+        if (joystick != null)
         {
-            Input.gyro.enabled = true;
-            Debug.Log("Gyroscope enabled for steering");
+            Debug.Log("Joystick found - AC-style controls active (Left/Right + Up/Down, Tap for boost)");
         }
         else
         {
-            Debug.Log("Gyroscope not available - using joystick/keyboard for testing");
+            Debug.Log("No joystick - using keyboard (WASD/Arrows + Space for boost)");
         }
     }
 
     /// <summary>
-    /// Handle input detection - gyroscope tilt and tap-to-dive
+    /// Handle input detection - AC-style joystick control (left/right + up/down) and tap-to-flap
     /// Called in Update()
     /// </summary>
     public override void HandleInput()
     {
         base.HandleInput();
 
-        // ===== GYROSCOPIC STEERING INPUT =====
-        if (useGyroscope)
+        Vector3 rawInput = Vector3.zero;
+
+        // ===== JOYSTICK/KEYBOARD INPUT (AC-STYLE) =====
+        if (joystick != null)
         {
-            // Get gyroscope tilt (X-axis rotation for left/right tilt)
-            float tilt = Input.gyro.rotationRateUnbiased.y; // Y rotation rate for left/right
-            character.inputDirection = new Vector3(tilt, 0f, 0f);
+            // Joystick: Horizontal = left/right, Vertical = up/down
+            rawInput = new Vector3(joystick.Horizontal, joystick.Vertical, 0f);
         }
         else
         {
-            // Editor/Testing fallback - use joystick or keyboard
-            if (joystick != null)
-            {
-                character.inputDirection = new Vector3(joystick.Horizontal, 0f, 0f);
-            }
-            else
-            {
-                float horizontal = Input.GetAxis("Horizontal");
-                character.inputDirection = new Vector3(horizontal, 0f, 0f);
-            }
+            // Keyboard fallback: WASD or Arrow keys
+            float horizontal = Input.GetAxis("Horizontal"); // A/D or Left/Right arrows
+            float vertical = Input.GetAxis("Vertical");     // W/S or Up/Down arrows
+            rawInput = new Vector3(horizontal, vertical, 0f);
         }
+        
+        // ===== SMOOTH INPUT FOR AC-STYLE FEEL =====
+        // Use SmoothDamp for natural acceleration/deceleration
+        float smoothTime = 1f / character.inputResponsiveness;
+        smoothedInput = Vector3.SmoothDamp(smoothedInput, rawInput, ref inputVelocity, smoothTime);
+        
+        // Apply smoothed input
+        character.inputDirection = smoothedInput;
 
-        // ===== TAP-TO-DIVE INPUT =====
-        DetectDiveInput();
+        // ===== TAP-TO-FLAP BOOST INPUT =====
+        DetectFlapBoostInput();
     }
 
     /// <summary>
-    /// Detect tap input for dive mechanic
+    /// Detect tap input for flap boost (AC-style speed burst)
     /// Supports both touch (mobile) and keyboard (testing)
     /// </summary>
-    private void DetectDiveInput()
+    private void DetectFlapBoostInput()
     {
         bool tapDetected = false;
 
-        // Mobile touch input
+        // Mobile touch input (tap anywhere on screen)
         if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
         {
-            tapDetected = true;
+            // Make sure touch isn't on the joystick area
+            Touch touch = Input.GetTouch(0);
+            if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
+                joystick.GetComponent<RectTransform>(), touch.position))
+            {
+                tapDetected = true;
+            }
         }
         
-        // Editor testing - Space or Down arrow
-        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.DownArrow))
+        // Editor testing - Space bar
+        if (Input.GetKeyDown(KeyCode.Space))
         {
             tapDetected = true;
         }
 
-        // Execute dive if tap detected and cooldown ready
-        if (tapDetected && diveCooldownTimer <= 0f && !isDiving)
+        // Execute flap boost if tap detected and cooldown ready
+        if (tapDetected && flapCooldownTimer <= 0f && !isFlapBoosting)
         {
-            StartDive();
+            StartFlapBoost();
         }
     }
 
     /// <summary>
-    /// Initialize dive mechanic
+    /// Initialize flap boost mechanic (AC-style speed burst)
     /// </summary>
-    private void StartDive()
+    private void StartFlapBoost()
     {
-        isDiving = true;
-        diveTimer = DIVE_DURATION;
-        diveCooldownTimer = character.diveCooldown;
+        isFlapBoosting = true;
+        flapBoostTimer = character.flapBoostDuration;
+        flapCooldownTimer = character.flapCooldown;
         
-        Debug.Log("Dive started!");
+        // Reset gliding timer - flapping resets the cycle
+        isGliding = false;
+        flightTimer = 0f;
+        
+        Debug.Log("Flap boost activated! 🦅");
     }
 
     /// <summary>
@@ -133,21 +172,85 @@ public class FlyingState : State
     {
         base.LogicUpdate();
 
-        // Update dive timer
-        if (isDiving)
+        // Update flap boost timer
+        if (isFlapBoosting)
         {
-            diveTimer -= Time.deltaTime;
-            if (diveTimer <= 0f)
+            flapBoostTimer -= Time.deltaTime;
+            if (flapBoostTimer <= 0f)
             {
-                isDiving = false;
-                Debug.Log("Dive ended");
+                isFlapBoosting = false;
+                Debug.Log("Flap boost ended");
             }
         }
 
         // Update cooldown timer
-        if (diveCooldownTimer > 0f)
+        if (flapCooldownTimer > 0f)
         {
-            diveCooldownTimer -= Time.deltaTime;
+            flapCooldownTimer -= Time.deltaTime;
+        }
+        
+        // ===== AUTO FLYING/GLIDING TRANSITION =====
+        // Don't auto-transition while flap boosting
+        if (!isFlapBoosting)
+        {
+            flightTimer += Time.deltaTime;
+            
+            if (isGliding)
+            {
+                // Currently gliding - check if it's time to start flapping again
+                if (flightTimer >= character.glidingDuration)
+                {
+                    isGliding = false;
+                    flightTimer = 0f;
+                    Debug.Log("Switching from Gliding to Flying");
+                }
+            }
+            else
+            {
+                // Currently flying - check if it's time to glide
+                if (flightTimer >= character.flyingDuration)
+                {
+                    isGliding = true;
+                    flightTimer = 0f;
+                    Debug.Log("Switching from Flying to Gliding");
+                }
+            }
+        }
+        
+        // ===== DYNAMIC SPEED CALCULATION (AC-STYLE) =====
+        // Calculate altitude change
+        float currentAltitude = character.transform.position.y;
+        float altitudeChange = (currentAltitude - previousAltitude) / Time.deltaTime;
+        previousAltitude = currentAltitude;
+        
+        // Determine target speed multiplier based on state
+        if (isFlapBoosting)
+        {
+            targetSpeedMultiplier = character.flapSpeedMultiplier;
+        }
+        else if (isGliding)
+        {
+            targetSpeedMultiplier = character.glideSpeedMultiplier;
+        }
+        else
+        {
+            targetSpeedMultiplier = 1f;
+        }
+        
+        // Add altitude influence (descending = faster, climbing = slower)
+        float altitudeSpeedMod = -altitudeChange * character.altitudeSpeedInfluence * 0.01f;
+        targetSpeedMultiplier += altitudeSpeedMod;
+        
+        // Clamp speed multiplier to reasonable range
+        targetSpeedMultiplier = Mathf.Clamp(targetSpeedMultiplier, 0.5f, 2.5f);
+        
+        // Smooth transition to target speed
+        currentSpeedMultiplier = Mathf.Lerp(currentSpeedMultiplier, targetSpeedMultiplier, Time.deltaTime * 2f);
+        
+        // Apply speed to path follower
+        if (pathFollower != null)
+        {
+            pathFollower.followSpeed = character.forwardSpeed * currentSpeedMultiplier;
         }
     }
 
@@ -158,7 +261,8 @@ public class FlyingState : State
     }
 
     /// <summary>
-    /// Physics-based movement - constant forward flight, gyroscopic steering, and dive force
+    /// Physics-based movement - AC-style smooth joystick control (left/right + up/down)
+    /// Enhanced with momentum, drag, and flap boost mechanics
     /// Called in FixedUpdate()
     /// </summary>
     public override void PhysicsUpdate()
@@ -166,21 +270,24 @@ public class FlyingState : State
         base.PhysicsUpdate();
 
         // Note: BirdPathFollower (Runner) controls forward movement along the path
-        // We only apply lateral steering forces and dive forces here
+        // We apply lateral (X) and vertical (Y) steering forces, plus boost/lift
 
-        // ===== GYROSCOPIC STEERING (LATERAL MOVEMENT) =====
-        // Apply left/right forces based on tilt/input
-        if (Mathf.Abs(character.inputDirection.x) > 0.05f)
+        // ===== SMOOTH LATERAL MOVEMENT (LEFT/RIGHT) =====
+        float horizontalInput = character.inputDirection.x;
+        
+        if (Mathf.Abs(horizontalInput) > 0.01f)
         {
-            // Apply lateral force (works with Runner's position control)
-            float lateralForce = character.inputDirection.x * character.moveSpeed * 10f;
-            character.rb.AddForce(Vector3.right * lateralForce, ForceMode.Force);
+            // Calculate desired lateral velocity
+            float targetLateralVelocity = horizontalInput * character.moveSpeed;
             
-            // Update lateral position tracking for path follower
-            currentLateralPosition += character.inputDirection.x * character.moveSpeed * Time.fixedDeltaTime;
+            // Smoothly accelerate towards target velocity
+            lateralVelocity = Mathf.Lerp(lateralVelocity, targetLateralVelocity, Time.fixedDeltaTime * character.inputResponsiveness);
+            
+            // Apply smooth lateral movement
+            currentLateralPosition += lateralVelocity * Time.fixedDeltaTime;
             currentLateralPosition = Mathf.Clamp(currentLateralPosition, -character.maxLateralDistance, character.maxLateralDistance);
             
-            // Update path follower lateral offset if available
+            // Update path follower lateral offset
             if (pathFollower != null)
             {
                 pathFollower.SetLateralOffset(currentLateralPosition);
@@ -188,17 +295,72 @@ public class FlyingState : State
         }
         else
         {
-            // No input - dampen lateral velocity
-            Vector3 velocity = character.rb.linearVelocity;
-            Vector3 dampingForce = Vector3.right * -velocity.x * 5f;
-            character.rb.AddForce(dampingForce, ForceMode.Force);
+            // No input - apply smooth deceleration using air drag
+            lateralVelocity = Mathf.Lerp(lateralVelocity, 0f, Time.fixedDeltaTime * character.airDrag * 2f);
+            
+            // Continue drifting with remaining momentum
+            currentLateralPosition += lateralVelocity * Time.fixedDeltaTime;
+            currentLateralPosition = Mathf.Clamp(currentLateralPosition, -character.maxLateralDistance, character.maxLateralDistance);
+            
+            if (pathFollower != null)
+            {
+                pathFollower.SetLateralOffset(currentLateralPosition);
+            }
+        }
+        
+        // ===== SMOOTH VERTICAL MOVEMENT (UP/DOWN) =====
+        float verticalInput = character.inputDirection.y;
+        
+        if (Mathf.Abs(verticalInput) > 0.01f)
+        {
+            // Calculate desired vertical velocity
+            float targetVerticalVelocity = verticalInput * character.verticalSpeed;
+            
+            // Smoothly accelerate towards target velocity
+            verticalVelocity = Mathf.Lerp(verticalVelocity, targetVerticalVelocity, Time.fixedDeltaTime * character.inputResponsiveness);
+            
+            // Apply smooth vertical movement
+            currentVerticalOffset += verticalVelocity * Time.fixedDeltaTime;
+            currentVerticalOffset = Mathf.Clamp(currentVerticalOffset, -character.maxVerticalOffset, character.maxVerticalOffset);
+            
+            // Update path follower vertical offset
+            if (pathFollower != null)
+            {
+                pathFollower.heightOffset = currentVerticalOffset;
+            }
+        }
+        else
+        {
+            // No input - apply smooth deceleration
+            verticalVelocity = Mathf.Lerp(verticalVelocity, 0f, Time.fixedDeltaTime * character.airDrag * 2f);
+            
+            // Continue drifting with remaining momentum
+            currentVerticalOffset += verticalVelocity * Time.fixedDeltaTime;
+            currentVerticalOffset = Mathf.Clamp(currentVerticalOffset, -character.maxVerticalOffset, character.maxVerticalOffset);
+            
+            if (pathFollower != null)
+            {
+                pathFollower.heightOffset = currentVerticalOffset;
+            }
         }
 
-        // ===== TAP-TO-DIVE MECHANIC =====
-        if (isDiving)
+        // ===== AIR DRAG (AC-STYLE RESISTANCE) =====
+        // Apply gentle drag to all movement for natural deceleration
+        Vector3 dragForce = -character.rb.linearVelocity * character.airDrag;
+        dragForce.z *= 0.1f; // Less drag on forward movement
+        character.rb.AddForce(dragForce, ForceMode.Force);
+
+        // ===== FLAP BOOST MECHANIC (AC-STYLE) =====
+        if (isFlapBoosting)
         {
-            // Apply downward force for dive
-            character.rb.AddForce(Vector3.down * character.diveForce, ForceMode.Force);
+            // Apply forward boost force
+            Vector3 boostDirection = character.transform.forward;
+            character.rb.AddForce(boostDirection * character.flapBoostForce, ForceMode.Acceleration);
+        }
+        else if (isGliding)
+        {
+            // Subtle lift during gliding for realistic flight
+            character.rb.AddForce(Vector3.up * 2f, ForceMode.Force);
         }
 
         // Note: Rotation is handled by BirdPathFollower which aligns bird with path direction
@@ -213,9 +375,14 @@ public class FlyingState : State
 
         if (character.animationManager != null)
         {
-            if (isDiving)
+            if (isFlapBoosting)
             {
-                character.animationManager.PlayDiving();
+                // Use flying animation during flap boost (active flapping)
+                character.animationManager.PlayFlying();
+            }
+            else if (isGliding)
+            {
+                character.animationManager.PlayGliding();
             }
             else
             {
@@ -227,12 +394,6 @@ public class FlyingState : State
     public override void Exit()
     {
         base.Exit();
-        isDiving = false;
-        
-        // Disable gyroscope when exiting
-        if (useGyroscope)
-        {
-            Input.gyro.enabled = false;
-        }
+        isFlapBoosting = false;
     }
 }
