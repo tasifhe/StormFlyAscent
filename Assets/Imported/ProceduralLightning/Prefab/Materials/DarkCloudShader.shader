@@ -11,101 +11,217 @@
     }
     SubShader
 	{
-        Tags { "Queue"="Transparent" }
+        Tags 
+		{ 
+			"RenderType" = "Transparent"
+			"Queue" = "Transparent"
+			"RenderPipeline" = "UniversalPipeline"
+		}
 		Blend SrcAlpha OneMinusSrcAlpha
         LOD 100
  
         Pass
 		{
+			Name "ForwardLit"
+			Tags { "LightMode" = "UniversalForward" }
+			
 			Cull Off
-            Lighting On
 			ZWrite Off
 			ColorMask RGBA
 				 
-            CGPROGRAM
+            HLSLPROGRAM
 
             #pragma vertex vert
             #pragma fragment frag
-			#pragma fragmentoption ARB_precision_hint_fastest
+			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+			#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+			#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+			#pragma multi_compile_fragment _ _SHADOWS_SOFT
+			#pragma multi_compile_fog
 
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-			fixed4 _TintColor;
-			float _DirectionalLightMultiplier;
-			float _PointSpotLightMultiplier;
-			fixed3 _EmissiveColor;
-			fixed _AmbientLightMultiplier;
+			CBUFFER_START(UnityPerMaterial)
+				float4 _MainTex_ST;
+				half4 _TintColor;
+				float _DirectionalLightMultiplier;
+				float _PointSpotLightMultiplier;
+				half3 _EmissiveColor;
+				half _AmbientLightMultiplier;
+			CBUFFER_END
 
-			struct appdata_t
+			TEXTURE2D(_MainTex);
+			SAMPLER(sampler_MainTex);
+
+			struct Attributes
 			{
-				float4 vertex : POSITION;
-				fixed4 color : COLOR;
+				float4 positionOS : POSITION;
+				half4 color : COLOR;
 				float2 texcoord : TEXCOORD0;
-				float3 normal : NORMAL;
+				float3 normalOS : NORMAL;
 			};
-
-			fixed3 ApplyLight(int index, fixed3 lightColor, float3 pos, float3 normal)
-			{
-				float4 lightPos = unity_LightPosition[index];
-				fixed3 currentLightColor = unity_LightColor[index].rgb;
-
-				if (lightPos.w == 0)
-				{
-					// directional light, the lightPos is actually the direction of the light
-					fixed3 diff = max(0, dot(normal, normalize(lightPos)));
-					return lightColor + (currentLightColor * diff * _DirectionalLightMultiplier);
-				}
-				else
-				{
-					float3 toLight = pos.xyz - lightPos;
-	                float lengthSq = dot(toLight, toLight);
-	                float atten = 1.0 / (1.0 + (lengthSq * unity_LightAtten[index].z));
-					float diff = max(0, dot(normal, normalize(toLight)));
-					return lightColor + (currentLightColor * diff * atten * _PointSpotLightMultiplier);
-				}
-			}
  
-            fixed4 ApplyLightsToVertex(float4 vertex, float3 normal, fixed4 color)
+            struct Varyings
             {
-                //float3 viewPos = mul(UNITY_MATRIX_MV, vertex).xyz;
-                //float3 viewNormal = mul((float3x3)UNITY_MATRIX_IT_MV, normal);
-				fixed3 lightColor = _EmissiveColor + (UNITY_LIGHTMODEL_AMBIENT.xyz * _AmbientLightMultiplier);
-
-				lightColor = ApplyLight(0, lightColor, vertex, normal);
-				lightColor = ApplyLight(1, lightColor, vertex, normal);
-				lightColor = ApplyLight(2, lightColor, vertex, normal);
-				lightColor = ApplyLight(3, lightColor, vertex, normal);
-
-                return fixed4(lightColor, 1) * color;
-            }
- 
-            struct v2f
-            {
-                half2 uv_MainTex : TEXCOORD0;
-                fixed4 color : COLOR0;
-                float4 pos : SV_POSITION;
+                float2 uv : TEXCOORD0;
+				float3 positionWS : TEXCOORD1;
+				float3 normalWS : TEXCOORD2;
+                half4 color : COLOR0;
+                float4 positionCS : SV_POSITION;
+				float fogFactor : TEXCOORD3;
             };
- 
-            float4 _MainTex_ST;
-			sampler2D _MainTex;
 			 
-            v2f vert(appdata_t v)
+            Varyings vert(Attributes input)
             {
-                v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
-                o.uv_MainTex = TRANSFORM_TEX(v.texcoord, _MainTex);
-                o.color = ApplyLightsToVertex(v.vertex, v.normal, v.color) * _TintColor;
-                return o; 
+                Varyings output;
+				
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+				VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
+				
+                output.positionCS = vertexInput.positionClipSpace;
+				output.positionWS = vertexInput.positionWS;
+				output.normalWS = normalInput.normalWS;
+                output.uv = TRANSFORM_TEX(input.texcoord, _MainTex);
+				output.fogFactor = ComputeFogFactor(output.positionCS.z);
+				
+				// Calculate lighting
+				Light mainLight = GetMainLight();
+				half3 lightColor = _EmissiveColor + (half3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w) * _AmbientLightMultiplier);
+				
+				// Main directional light
+				half3 mainLightDiffuse = saturate(dot(normalInput.normalWS, mainLight.direction));
+				lightColor += mainLight.color * mainLightDiffuse * _DirectionalLightMultiplier;
+				
+				// Additional lights
+				#ifdef _ADDITIONAL_LIGHTS_VERTEX
+					uint pixelLightCount = GetAdditionalLightsCount();
+					for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
+					{
+						Light light = GetAdditionalLight(lightIndex, vertexInput.positionWS);
+						half3 attenuatedLightColor = light.color * light.distanceAttenuation;
+						half3 lightDiffuse = saturate(dot(normalInput.normalWS, light.direction));
+						lightColor += attenuatedLightColor * lightDiffuse * _PointSpotLightMultiplier;
+					}
+				#endif
+				
+                output.color = half4(lightColor, 1) * input.color * _TintColor;
+                return output; 
             }
   
-            fixed4 frag (v2f i) : COLOR {
-            
-                // base texture
-                return tex2D(_MainTex, i.uv_MainTex) * i.color;
+            half4 frag (Varyings input) : SV_Target
+			{
+                // Sample texture
+				half4 texColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+                half4 finalColor = texColor * input.color;
+				
+				// Apply additional per-pixel lights if enabled
+				#ifdef _ADDITIONAL_LIGHTS
+					uint pixelLightCount = GetAdditionalLightsCount();
+					for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
+					{
+						Light light = GetAdditionalLight(lightIndex, input.positionWS);
+						half3 attenuatedLightColor = light.color * light.distanceAttenuation;
+						half3 lightDiffuse = saturate(dot(input.normalWS, light.direction));
+						finalColor.rgb += texColor.rgb * attenuatedLightColor * lightDiffuse * _PointSpotLightMultiplier;
+					}
+				#endif
+				
+				// Apply fog
+				finalColor.rgb = MixFog(finalColor.rgb, input.fogFactor);
+				
+                return finalColor;
             }
-            ENDCG
+            ENDHLSL
         }
+		
+		// Shadow caster pass for URP
+		Pass
+		{
+			Name "ShadowCaster"
+			Tags { "LightMode" = "ShadowCaster" }
+			
+			ZWrite On
+			ZTest LEqual
+			ColorMask 0
+			Cull Off
+			
+			HLSLPROGRAM
+			#pragma vertex ShadowPassVertex
+			#pragma fragment ShadowPassFragment
+			
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			
+			struct Attributes
+			{
+				float4 positionOS : POSITION;
+				float3 normalOS : NORMAL;
+			};
+			
+			struct Varyings
+			{
+				float4 positionCS : SV_POSITION;
+			};
+			
+			float3 _LightDirection;
+			
+			Varyings ShadowPassVertex(Attributes input)
+			{
+				Varyings output;
+				float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+				float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+				output.positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
+				return output;
+			}
+			
+			half4 ShadowPassFragment(Varyings input) : SV_TARGET
+			{
+				return 0;
+			}
+			ENDHLSL
+		}
+		
+		// Depth only pass for URP
+		Pass
+		{
+			Name "DepthOnly"
+			Tags { "LightMode" = "DepthOnly" }
+			
+			ZWrite On
+			ColorMask 0
+			Cull Off
+			
+			HLSLPROGRAM
+			#pragma vertex DepthOnlyVertex
+			#pragma fragment DepthOnlyFragment
+			
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			
+			struct Attributes
+			{
+				float4 positionOS : POSITION;
+			};
+			
+			struct Varyings
+			{
+				float4 positionCS : SV_POSITION;
+			};
+			
+			Varyings DepthOnlyVertex(Attributes input)
+			{
+				Varyings output;
+				output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+				return output;
+			}
+			
+			half4 DepthOnlyFragment(Varyings input) : SV_TARGET
+			{
+				return 0;
+			}
+			ENDHLSL
+		}
     }
  
-    Fallback "Particles/VertexLit"
+    Fallback "Universal Render Pipeline/Particles/Unlit"
 }
