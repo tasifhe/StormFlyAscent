@@ -81,11 +81,17 @@ public class BirdPathFollower : Runner
         // Configure offset
         _motion.offset = Vector2.zero; // We'll update this dynamically
         _motion.useSplineSizes = false;
+        
+        // Subscribe to LevelGenerator ready event for immediate start
+        if (LevelGenerator.instance != null)
+        {
+            LevelGenerator.onReady += OnLevelGeneratorReady;
+        }
     }
     
     private void Start()
     {
-        // Start following when ready
+        // Start following immediately if already ready
         if (LevelGenerator.instance != null && LevelGenerator.instance.ready)
         {
             StartFollow();
@@ -93,15 +99,28 @@ public class BirdPathFollower : Runner
         }
     }
     
+    private void OnDestroy()
+    {
+        // Unsubscribe from event
+        if (LevelGenerator.instance != null)
+        {
+            LevelGenerator.onReady -= OnLevelGeneratorReady;
+        }
+    }
+    
+    private void OnLevelGeneratorReady()
+    {
+        // Start following immediately when level becomes ready
+        if (!follow)
+        {
+            StartFollow();
+            Debug.Log("BirdPathFollower: Level ready - Started following Forever path immediately!");
+        }
+    }
+    
     protected override void Update()
     {
         base.Update(); // Call Runner's update
-        
-        // Auto-start if not following yet
-        if (!follow && LevelGenerator.instance != null && LevelGenerator.instance.ready)
-        {
-            StartFollow();
-        }
         
         // Update speed from character
         if (character != null)
