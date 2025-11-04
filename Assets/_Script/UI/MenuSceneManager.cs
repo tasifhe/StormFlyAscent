@@ -10,7 +10,7 @@ public class MenuSceneManager : MonoBehaviour
 {
     [Header("Scene Names")]
     [SerializeField] private string mainMenuSceneName = "Main Menu";
-    [SerializeField] private string gameSceneName = "SampleScene"; // Change to your gameplay scene
+    [SerializeField] private string gameSceneName = "PLAYGROUND"; // Change to your gameplay scene
     
     [Header("Loading Screen")]
     [SerializeField] private GameObject loadingPanel;

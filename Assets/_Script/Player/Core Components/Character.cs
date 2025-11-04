@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using TMPro;
 using Animancer;
@@ -75,6 +76,9 @@ public class Character : MonoBehaviour
 
     private void Start()
     {
+        // CRITICAL: Ensure EventSystem exists for joystick touch input
+        EnsureEventSystem();
+        
         rb = GetComponent<Rigidbody>();
         //animationManager = GetComponent<BirdAnimationManager>();
         
@@ -101,4 +105,24 @@ public class Character : MonoBehaviour
         movementSM.currentState.PhysicsUpdate();
     }
    
+    /// <summary>
+    /// Ensures an EventSystem exists for joystick touch input (CRITICAL!)
+    /// </summary>
+    private void EnsureEventSystem()
+    {
+        EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
+        
+        if (eventSystem == null)
+        {
+            Debug.LogWarning("[Character] No EventSystem found! Creating one for joystick touch input...");
+            GameObject eventSystemObj = new GameObject("EventSystem");
+            eventSystemObj.AddComponent<EventSystem>();
+            eventSystemObj.AddComponent<StandaloneInputModule>();
+            Debug.Log("[Character] EventSystem created successfully!");
+        }
+        else
+        {
+            Debug.Log("[Character] EventSystem found: " + eventSystem.gameObject.name);
+        }
+    }
 }

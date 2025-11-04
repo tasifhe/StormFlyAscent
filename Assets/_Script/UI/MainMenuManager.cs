@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using DG.Tweening;
 
 /// <summary>
@@ -40,6 +41,9 @@ public class MainMenuManager : MonoBehaviour
     
     private void Awake()
     {
+        // CRITICAL: Ensure EventSystem exists for touch input to work
+        EnsureEventSystem();
+        
         // Get references
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
@@ -330,6 +334,28 @@ public class MainMenuManager : MonoBehaviour
         #else
         Application.Quit();
         #endif
+    }
+    
+    /// <summary>
+    /// Ensures an EventSystem exists for UI input (CRITICAL for touch to work!)
+    /// </summary>
+    private void EnsureEventSystem()
+    {
+        EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
+        
+        if (eventSystem == null)
+        {
+            Debug.LogWarning("[MainMenuManager] No EventSystem found! Creating one for touch input...");
+            GameObject eventSystemObj = new GameObject("EventSystem");
+            eventSystemObj.AddComponent<EventSystem>();
+            eventSystemObj.AddComponent<StandaloneInputModule>();
+            DontDestroyOnLoad(eventSystemObj);
+            Debug.Log("[MainMenuManager] EventSystem created successfully!");
+        }
+        else
+        {
+            Debug.Log("[MainMenuManager] EventSystem found: " + eventSystem.gameObject.name);
+        }
     }
     
     #endregion

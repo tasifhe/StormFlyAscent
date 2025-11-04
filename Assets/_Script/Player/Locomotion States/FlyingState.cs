@@ -1,7 +1,12 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.EnhancedTouch;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
+using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 /// <summary>
 /// FlyingState - AC-style bird flight with joystick (left/right, up/down) and tap-to-flap boost
+/// Updated to use New Input System
 /// </summary>
 public class FlyingState : State
 {
@@ -42,6 +47,10 @@ public class FlyingState : State
     public override void Enter()
     {
         base.Enter();
+        
+        // Enable enhanced touch support for mobile (New Input System)
+        EnhancedTouchSupport.Enable();
+        TouchSimulation.Enable(); // For testing in editor
         
         isFlapBoosting = false;
         flapBoostTimer = 0f;
@@ -97,10 +106,34 @@ public class FlyingState : State
         }
         else
         {
-            // Keyboard fallback: WASD or Arrow keys
-            float horizontal = Input.GetAxis("Horizontal"); // A/D or Left/Right arrows
-            float vertical = Input.GetAxis("Vertical");     // W/S or Up/Down arrows
-            rawInput = new Vector3(horizontal, vertical, 0f);
+            // Keyboard fallback: New Input System
+            Vector2 moveInput = Vector2.zero;
+            
+            // Check keyboard
+            if (Keyboard.current != null)
+            {
+                float horizontal = 0f;
+                float vertical = 0f;
+                
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) horizontal -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) horizontal += 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vertical += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vertical -= 1f;
+                
+                moveInput = new Vector2(horizontal, vertical);
+            }
+            
+            // Check gamepad
+            if (Gamepad.current != null)
+            {
+                Vector2 stickInput = Gamepad.current.leftStick.ReadValue();
+                if (stickInput.sqrMagnitude > 0.01f)
+                {
+                    moveInput = stickInput;
+                }
+            }
+            
+            rawInput = new Vector3(moveInput.x, moveInput.y, 0f);
         }
         
         // ===== SMOOTH INPUT FOR AC-STYLE FEEL =====
@@ -117,26 +150,36 @@ public class FlyingState : State
 
     /// <summary>
     /// Detect tap input for flap boost (AC-style speed burst)
-    /// Supports both touch (mobile) and keyboard (testing)
+    /// Supports both touch (mobile) and keyboard (testing) - New Input System
     /// </summary>
     private void DetectFlapBoostInput()
     {
         bool tapDetected = false;
 
-        // Mobile touch input (tap anywhere on screen)
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        // Mobile touch input using New Input System Enhanced Touch
+        if (Touch.activeTouches.Count > 0)
         {
-            // Make sure touch isn't on the joystick area
-            Touch touch = Input.GetTouch(0);
-            if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
-                joystick.GetComponent<RectTransform>(), touch.position))
+            Touch touch = Touch.activeTouches[0];
+            
+            if (touch.phase == TouchPhase.Began)
             {
-                tapDetected = true;
+                // Make sure touch isn't on the joystick area
+                if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
+                    joystick.GetComponent<RectTransform>(), touch.screenPosition))
+                {
+                    tapDetected = true;
+                }
             }
         }
         
-        // Editor testing - Space bar
-        if (Input.GetKeyDown(KeyCode.Space))
+        // Keyboard input - Space bar (New Input System)
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            tapDetected = true;
+        }
+        
+        // Gamepad input - South button (A on Xbox, X on PlayStation)
+        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
         {
             tapDetected = true;
         }

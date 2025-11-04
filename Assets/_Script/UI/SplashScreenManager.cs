@@ -1,7 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.EnhancedTouch;
 using TMPro;
 using System.Collections;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 /// <summary>
 /// Manages the "Tap to Start" splash screen that appears when the game loads
@@ -27,6 +30,10 @@ public class SplashScreenManager : MonoBehaviour
     
     private void Start()
     {
+        // Enable Enhanced Touch Support for New Input System
+        EnhancedTouchSupport.Enable();
+        TouchSimulation.Enable(); // For testing in editor
+        
         if (splashPanel != null)
             splashPanel.SetActive(true);
             
@@ -45,23 +52,29 @@ public class SplashScreenManager : MonoBehaviour
         if (hasStarted || isTransitioning)
             return;
         
-        // Detect tap/click input
+        // Detect tap/click input using New Input System
         bool inputDetected = false;
         
-        // Touch input (mobile)
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        // Touch input (mobile) - New Input System Enhanced Touch
+        if (Touch.activeTouches.Count > 0 && Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
         {
             inputDetected = true;
         }
         
-        // Mouse input (testing)
-        if (Input.GetMouseButtonDown(0))
+        // Mouse input (testing) - New Input System
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
             inputDetected = true;
         }
         
-        // Keyboard input (testing)
-        if (Input.anyKeyDown)
+        // Keyboard input (testing) - New Input System
+        if (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+        {
+            inputDetected = true;
+        }
+        
+        // Gamepad input - New Input System
+        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
         {
             inputDetected = true;
         }
