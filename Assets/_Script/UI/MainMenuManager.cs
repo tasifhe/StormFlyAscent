@@ -1,9 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
+using DG.Tweening;
 
 /// <summary>
-/// Main menu manager that controls navigation between menu panels
+/// Main menu manager that controls navigation between menu panels with DOTween animations
 /// </summary>
 public class MainMenuManager : MonoBehaviour
 {
@@ -18,9 +18,17 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] private Button customizationButton;
     [SerializeField] private Button exitButton;
     
+    [Header("DOTween Animation Settings")]
+    [SerializeField] private float panelFadeDuration = 0.4f;
+    [SerializeField] private float panelScaleDuration = 0.5f;
+    [SerializeField] private float buttonScaleDuration = 0.2f;
+    [SerializeField] private Ease panelEaseIn = Ease.OutBack;
+    [SerializeField] private Ease panelEaseOut = Ease.InBack;
+    [SerializeField] private Vector3 panelStartScale = new Vector3(0.8f, 0.8f, 1f);
+    [SerializeField] private float buttonHoverScale = 1.1f;
+    
     [Header("Settings")]
     [SerializeField] private bool hideOnStart = true;
-    [SerializeField] private float panelTransitionDuration = 0.3f;
     
     [Header("Audio (Optional)")]
     [SerializeField] private AudioClip buttonClickSound;
@@ -48,6 +56,12 @@ public class MainMenuManager : MonoBehaviour
             customizationButton.onClick.AddListener(OnCustomizationButtonClicked);
         if (exitButton != null)
             exitButton.onClick.AddListener(OnExitButtonClicked);
+        
+        // Add hover effects to all buttons
+        AddButtonHoverEffect(startButton);
+        AddButtonHoverEffect(settingsButton);
+        AddButtonHoverEffect(customizationButton);
+        AddButtonHoverEffect(exitButton);
     }
     
     private void Start()
@@ -63,6 +77,15 @@ public class MainMenuManager : MonoBehaviour
         {
             ShowMainMenu();
         }
+    }
+    
+    private void OnDestroy()
+    {
+        // Kill all DOTween animations on this object to prevent memory leaks
+        DOTween.Kill(this);
+        if (mainMenuPanel != null) DOTween.Kill(mainMenuPanel.transform);
+        if (settingsPanel != null) DOTween.Kill(settingsPanel.transform);
+        if (customizationPanel != null) DOTween.Kill(customizationPanel.transform);
     }
     
     #region Public Methods
@@ -95,6 +118,7 @@ public class MainMenuManager : MonoBehaviour
     
     private void OnStartButtonClicked()
     {
+        AnimateButtonClick(startButton);
         PlaySound(buttonClickSound);
         Debug.Log("Start button clicked - Loading game...");
         
@@ -114,6 +138,7 @@ public class MainMenuManager : MonoBehaviour
     
     private void OnSettingsButtonClicked()
     {
+        AnimateButtonClick(settingsButton);
         PlaySound(buttonClickSound);
         Debug.Log("Settings button clicked");
         
@@ -125,6 +150,7 @@ public class MainMenuManager : MonoBehaviour
     
     private void OnCustomizationButtonClicked()
     {
+        AnimateButtonClick(customizationButton);
         PlaySound(buttonClickSound);
         Debug.Log("Customization button clicked");
         
@@ -136,6 +162,7 @@ public class MainMenuManager : MonoBehaviour
     
     private void OnExitButtonClicked()
     {
+        AnimateButtonClick(exitButton);
         PlaySound(buttonClickSound);
         Debug.Log("Exit button clicked");
         
@@ -167,11 +194,26 @@ public class MainMenuManager : MonoBehaviour
         {
             panel.SetActive(true);
             
-            // Optional: Add fade-in animation
+            // Get or add CanvasGroup for fade animation
             CanvasGroup canvasGroup = panel.GetComponent<CanvasGroup>();
-            if (canvasGroup != null)
+            if (canvasGroup == null)
+                canvasGroup = panel.AddComponent<CanvasGroup>();
+            
+            RectTransform rectTransform = panel.GetComponent<RectTransform>();
+            
+            // Kill any existing tweens on this panel
+            DOTween.Kill(canvasGroup);
+            DOTween.Kill(rectTransform);
+            
+            // Animate fade in
+            canvasGroup.alpha = 0f;
+            canvasGroup.DOFade(1f, panelFadeDuration).SetEase(panelEaseIn);
+            
+            // Animate scale in (from small to normal)
+            if (rectTransform != null)
             {
-                StartCoroutine(FadeInPanel(canvasGroup));
+                rectTransform.localScale = panelStartScale;
+                rectTransform.DOScale(Vector3.one, panelScaleDuration).SetEase(panelEaseIn);
             }
         }
     }
@@ -180,48 +222,89 @@ public class MainMenuManager : MonoBehaviour
     {
         if (panel != null)
         {
-            // Optional: Add fade-out animation
             CanvasGroup canvasGroup = panel.GetComponent<CanvasGroup>();
-            if (canvasGroup != null)
+            if (canvasGroup == null)
+                canvasGroup = panel.AddComponent<CanvasGroup>();
+            
+            RectTransform rectTransform = panel.GetComponent<RectTransform>();
+            
+            // Kill any existing tweens
+            DOTween.Kill(canvasGroup);
+            DOTween.Kill(rectTransform);
+            
+            // Animate fade out
+            canvasGroup.DOFade(0f, panelFadeDuration).SetEase(panelEaseOut);
+            
+            // Animate scale out (from normal to small)
+            if (rectTransform != null)
             {
-                StartCoroutine(FadeOutPanel(canvasGroup, panel));
+                rectTransform.DOScale(panelStartScale, panelScaleDuration)
+                    .SetEase(panelEaseOut)
+                    .OnComplete(() => panel.SetActive(false));
             }
             else
             {
-                panel.SetActive(false);
+                // If no RectTransform, just delay deactivation
+                DOVirtual.DelayedCall(panelFadeDuration, () => panel.SetActive(false));
             }
         }
     }
     
-    private IEnumerator FadeInPanel(CanvasGroup canvasGroup)
+    /// <summary>
+    /// Add button hover effects (call this for each button you want to animate)
+    /// </summary>
+    public void AddButtonHoverEffect(Button button)
     {
-        float elapsed = 0f;
-        canvasGroup.alpha = 0f;
+        if (button == null) return;
         
-        while (elapsed < panelTransitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(0f, 1f, elapsed / panelTransitionDuration);
-            yield return null;
-        }
+        // Add event triggers for hover
+        UnityEngine.EventSystems.EventTrigger trigger = button.gameObject.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+        if (trigger == null)
+            trigger = button.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
         
-        canvasGroup.alpha = 1f;
+        // Pointer Enter (hover)
+        UnityEngine.EventSystems.EventTrigger.Entry entryEnter = new UnityEngine.EventSystems.EventTrigger.Entry();
+        entryEnter.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
+        entryEnter.callback.AddListener((data) => { AnimateButtonHover(button, true); });
+        trigger.triggers.Add(entryEnter);
+        
+        // Pointer Exit (unhover)
+        UnityEngine.EventSystems.EventTrigger.Entry entryExit = new UnityEngine.EventSystems.EventTrigger.Entry();
+        entryExit.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
+        entryExit.callback.AddListener((data) => { AnimateButtonHover(button, false); });
+        trigger.triggers.Add(entryExit);
     }
     
-    private IEnumerator FadeOutPanel(CanvasGroup canvasGroup, GameObject panel)
+    private void AnimateButtonHover(Button button, bool hover)
     {
-        float elapsed = 0f;
-        canvasGroup.alpha = 1f;
+        if (button == null) return;
         
-        while (elapsed < panelTransitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(1f, 0f, elapsed / panelTransitionDuration);
-            yield return null;
-        }
+        RectTransform rectTransform = button.GetComponent<RectTransform>();
+        if (rectTransform == null) return;
         
-        canvasGroup.alpha = 0f;
-        panel.SetActive(false);
+        // Kill existing tweens
+        DOTween.Kill(rectTransform);
+        
+        // Animate scale
+        float targetScale = hover ? buttonHoverScale : 1f;
+        rectTransform.DOScale(targetScale, buttonScaleDuration).SetEase(Ease.OutQuad);
+    }
+    
+    /// <summary>
+    /// Animate button click (scale down then up)
+    /// </summary>
+    public void AnimateButtonClick(Button button)
+    {
+        if (button == null) return;
+        
+        RectTransform rectTransform = button.GetComponent<RectTransform>();
+        if (rectTransform == null) return;
+        
+        // Kill existing tweens
+        DOTween.Kill(rectTransform);
+        
+        // Punch scale effect (like a click)
+        rectTransform.DOPunchScale(Vector3.one * 0.1f, buttonScaleDuration, 5, 0.5f);
     }
     
     private void PlaySound(AudioClip clip)
