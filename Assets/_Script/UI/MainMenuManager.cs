@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using DG.Tweening;
 
 /// <summary>
@@ -338,6 +339,7 @@ public class MainMenuManager : MonoBehaviour
     
     /// <summary>
     /// Ensures an EventSystem exists for UI input (CRITICAL for touch to work!)
+    /// FIXED: Now uses InputSystemUIInputModule for New Input System
     /// </summary>
     private void EnsureEventSystem()
     {
@@ -348,13 +350,23 @@ public class MainMenuManager : MonoBehaviour
             Debug.LogWarning("[MainMenuManager] No EventSystem found! Creating one for touch input...");
             GameObject eventSystemObj = new GameObject("EventSystem");
             eventSystemObj.AddComponent<EventSystem>();
-            eventSystemObj.AddComponent<StandaloneInputModule>();
+            eventSystemObj.AddComponent<InputSystemUIInputModule>(); // NEW INPUT SYSTEM!
             DontDestroyOnLoad(eventSystemObj);
-            Debug.Log("[MainMenuManager] EventSystem created successfully!");
+            Debug.Log("[MainMenuManager] EventSystem created with InputSystemUIInputModule!");
         }
         else
         {
             Debug.Log("[MainMenuManager] EventSystem found: " + eventSystem.gameObject.name);
+            
+            // Check if it has the correct input module
+            if (eventSystem.GetComponent<InputSystemUIInputModule>() == null && 
+                eventSystem.GetComponent<StandaloneInputModule>() != null)
+            {
+                Debug.LogWarning("[MainMenuManager] EventSystem has OLD StandaloneInputModule! Replacing...");
+                Destroy(eventSystem.GetComponent<StandaloneInputModule>());
+                eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+                Debug.Log("[MainMenuManager] InputSystemUIInputModule added!");
+            }
         }
     }
     

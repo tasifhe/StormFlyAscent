@@ -52,35 +52,84 @@ public class SplashScreenManager : MonoBehaviour
         if (hasStarted || isTransitioning)
             return;
         
-        // Detect tap/click input using New Input System
+        // DEBUG: Log touch info every 60 frames
+        if (Time.frameCount % 60 == 0)
+        {
+            int touchCount = Touch.activeTouches.Count;
+            int touchscreenCount = Touchscreen.current != null ? Touchscreen.current.touches.Count : 0;
+            int oldTouchCount = Input.touchCount; // Old Input System (Unity Remote)
+            Debug.Log($"[SplashScreen] EnhancedTouch: {touchCount}, Touchscreen: {touchscreenCount}, Old Input.touchCount: {oldTouchCount}");
+        }
+        
+        // Detect tap/click input - MULTIPLE METHODS for compatibility
         bool inputDetected = false;
         
-        // Touch input (mobile) - New Input System Enhanced Touch
-        if (Touch.activeTouches.Count > 0 && Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
+        // METHOD 1: Enhanced Touch (mobile) - New Input System
+        if (Touch.activeTouches.Count > 0)
         {
-            inputDetected = true;
+            Touch touch = Touch.activeTouches[0];
+            Debug.Log($"[SplashScreen] EnhancedTouch detected! Phase: {touch.phase}");
+            
+            if (touch.phase == UnityEngine.InputSystem.TouchPhase.Began)
+            {
+                Debug.Log("[SplashScreen] EnhancedTouch BEGAN - triggering!");
+                inputDetected = true;
+            }
+        }
+        
+        // METHOD 2: Direct Touchscreen (fallback for Android)
+        if (!inputDetected && Touchscreen.current != null)
+        {
+            var touches = Touchscreen.current.touches;
+            for (int i = 0; i < touches.Count; i++)
+            {
+                var touchControl = touches[i];
+                if (touchControl.press.wasPressedThisFrame)
+                {
+                    Debug.Log("[SplashScreen] Touchscreen.current touch detected - triggering!");
+                    inputDetected = true;
+                    break;
+                }
+            }
+        }
+        
+        // METHOD 3: Old Input System (Unity Remote compatibility)
+        if (!inputDetected && Input.touchCount > 0)
+        {
+            UnityEngine.Touch oldTouch = Input.GetTouch(0);
+            Debug.Log($"[SplashScreen] Old Input.GetTouch detected! Phase: {oldTouch.phase}");
+            
+            if (oldTouch.phase == UnityEngine.TouchPhase.Began)
+            {
+                Debug.Log("[SplashScreen] Old Input Touch BEGAN - triggering!");
+                inputDetected = true;
+            }
         }
         
         // Mouse input (testing) - New Input System
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        if (!inputDetected && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
+            Debug.Log("[SplashScreen] Mouse click detected - triggering!");
             inputDetected = true;
         }
         
         // Keyboard input (testing) - New Input System
-        if (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+        if (!inputDetected && Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
         {
+            Debug.Log("[SplashScreen] Keyboard press detected - triggering!");
             inputDetected = true;
         }
         
         // Gamepad input - New Input System
-        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
+        if (!inputDetected && Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
         {
+            Debug.Log("[SplashScreen] Gamepad button detected - triggering!");
             inputDetected = true;
         }
         
         if (inputDetected)
         {
+            Debug.Log("[SplashScreen] Input detected! Calling OnTapDetected()");
             OnTapDetected();
         }
     }

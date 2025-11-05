@@ -74,7 +74,7 @@ Material:
     - _Coverage: -0.39
     - _CoverageOffset: 0.31
     - _CullMode: 0
-    - _CutHeight: 10
+    - _CutHeight: 272.34
     - _CutHeight2: 1222
     - _Cutoff: 0.465
     - _Density: 0.00078
@@ -125,8 +125,8 @@ Material:
     - _ShadowColor: {r: 0.53475434, g: 0.53475434, b: 0.5754717, a: 0}
     - _SunColor: {r: 0.6784888, g: 0.70205027, b: 0.745283, a: 1.632549}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _Velocity1: {r: 10.02107, g: 0.0000011946038, b: 0, a: 0.07015933}
-    - _Velocity2: {r: 30.027191, g: 0.0000035795192, b: 0, a: 2}
+    - _Velocity1: {r: 10.020485, g: 0.0000011945342, b: 0, a: 0.07015516}
+    - _Velocity2: {r: 30.026, g: 0.000003579377, b: 0, a: 2}
     - _WindDirection: {r: 1, g: 0, b: 0, a: 0}
     - pointLightColor: {r: 1, g: 1, b: 1, a: 1}
     - pointLightPos: {r: -1655.3737, g: 690.0187, b: -1121.822, a: 0}

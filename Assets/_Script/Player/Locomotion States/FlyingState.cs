@@ -89,7 +89,8 @@ public class FlyingState : State
     }
 
     /// <summary>
-    /// Handle input detection - AC-style joystick control (left/right + up/down) and tap-to-flap
+    /// Handle input detection - ALL INPUTS WORK SIMULTANEOUSLY
+    /// Joystick (touch/mouse) + Keyboard + Gamepad all work together
     /// Called in Update()
     /// </summary>
     public override void HandleInput()
@@ -98,42 +99,51 @@ public class FlyingState : State
 
         Vector3 rawInput = Vector3.zero;
 
-        // ===== JOYSTICK/KEYBOARD INPUT (AC-STYLE) =====
+        // ===== JOYSTICK INPUT (Works with BOTH touch AND mouse!) =====
         if (joystick != null)
         {
-            // Joystick: Horizontal = left/right, Vertical = up/down
-            rawInput = new Vector3(joystick.Horizontal, joystick.Vertical, 0f);
+            // Joystick works with touch on mobile and mouse in editor
+            Vector2 joystickInput = new Vector2(joystick.Horizontal, joystick.Vertical);
+            if (joystickInput.sqrMagnitude > 0.01f)
+            {
+                rawInput = new Vector3(joystickInput.x, joystickInput.y, 0f);
+            }
         }
-        else
+        
+        // ===== KEYBOARD INPUT (Always works, can combine with joystick) =====
+        if (Keyboard.current != null)
         {
-            // Keyboard fallback: New Input System
-            Vector2 moveInput = Vector2.zero;
+            float horizontal = 0f;
+            float vertical = 0f;
             
-            // Check keyboard
-            if (Keyboard.current != null)
+            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) horizontal -= 1f;
+            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) horizontal += 1f;
+            if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vertical += 1f;
+            if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vertical -= 1f;
+            
+            // Add keyboard input to rawInput (combines with joystick)
+            Vector2 keyboardInput = new Vector2(horizontal, vertical);
+            if (keyboardInput.sqrMagnitude > 0.01f)
             {
-                float horizontal = 0f;
-                float vertical = 0f;
-                
-                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) horizontal -= 1f;
-                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) horizontal += 1f;
-                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vertical += 1f;
-                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vertical -= 1f;
-                
-                moveInput = new Vector2(horizontal, vertical);
+                rawInput += new Vector3(keyboardInput.x, keyboardInput.y, 0f);
             }
-            
-            // Check gamepad
-            if (Gamepad.current != null)
+        }
+        
+        // ===== GAMEPAD INPUT (Always works, can combine with others) =====
+        if (Gamepad.current != null)
+        {
+            Vector2 stickInput = Gamepad.current.leftStick.ReadValue();
+            if (stickInput.sqrMagnitude > 0.01f)
             {
-                Vector2 stickInput = Gamepad.current.leftStick.ReadValue();
-                if (stickInput.sqrMagnitude > 0.01f)
-                {
-                    moveInput = stickInput;
-                }
+                // Add gamepad input to rawInput
+                rawInput += new Vector3(stickInput.x, stickInput.y, 0f);
             }
-            
-            rawInput = new Vector3(moveInput.x, moveInput.y, 0f);
+        }
+        
+        // Clamp combined input to prevent overly fast movement
+        if (rawInput.sqrMagnitude > 1f)
+        {
+            rawInput = rawInput.normalized;
         }
         
         // ===== SMOOTH INPUT FOR AC-STYLE FEEL =====
@@ -149,14 +159,14 @@ public class FlyingState : State
     }
 
     /// <summary>
-    /// Detect tap input for flap boost (AC-style speed burst)
-    /// Supports both touch (mobile) and keyboard (testing) - New Input System
+    /// Detect tap input for flap boost - ALL INPUTS WORK!
+    /// Touch (mobile) + Mouse Click + Space Bar + Gamepad Button
     /// </summary>
     private void DetectFlapBoostInput()
     {
         bool tapDetected = false;
 
-        // Mobile touch input using New Input System Enhanced Touch
+        // ===== TOUCH INPUT (Mobile) =====
         if (Touch.activeTouches.Count > 0)
         {
             Touch touch = Touch.activeTouches[0];
@@ -172,13 +182,26 @@ public class FlyingState : State
             }
         }
         
-        // Keyboard input - Space bar (New Input System)
+        // ===== MOUSE INPUT (Editor/PC) =====
+        // Click anywhere except UI to flap
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            // Make sure click isn't on the joystick area
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
+                joystick.GetComponent<RectTransform>(), mousePos))
+            {
+                tapDetected = true;
+            }
+        }
+        
+        // ===== KEYBOARD INPUT (Space bar) =====
         if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
         {
             tapDetected = true;
         }
         
-        // Gamepad input - South button (A on Xbox, X on PlayStation)
+        // ===== GAMEPAD INPUT (A/X button) =====
         if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
         {
             tapDetected = true;

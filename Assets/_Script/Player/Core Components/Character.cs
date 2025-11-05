@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using TMPro;
 using Animancer;
 
@@ -107,6 +108,7 @@ public class Character : MonoBehaviour
    
     /// <summary>
     /// Ensures an EventSystem exists for joystick touch input (CRITICAL!)
+    /// FIXED: Now uses InputSystemUIInputModule for New Input System
     /// </summary>
     private void EnsureEventSystem()
     {
@@ -117,12 +119,22 @@ public class Character : MonoBehaviour
             Debug.LogWarning("[Character] No EventSystem found! Creating one for joystick touch input...");
             GameObject eventSystemObj = new GameObject("EventSystem");
             eventSystemObj.AddComponent<EventSystem>();
-            eventSystemObj.AddComponent<StandaloneInputModule>();
-            Debug.Log("[Character] EventSystem created successfully!");
+            eventSystemObj.AddComponent<InputSystemUIInputModule>(); // NEW INPUT SYSTEM!
+            Debug.Log("[Character] EventSystem created with InputSystemUIInputModule!");
         }
         else
         {
             Debug.Log("[Character] EventSystem found: " + eventSystem.gameObject.name);
+            
+            // Check if it has the correct input module
+            if (eventSystem.GetComponent<InputSystemUIInputModule>() == null && 
+                eventSystem.GetComponent<StandaloneInputModule>() != null)
+            {
+                Debug.LogWarning("[Character] EventSystem has OLD StandaloneInputModule! Replacing with InputSystemUIInputModule...");
+                Destroy(eventSystem.GetComponent<StandaloneInputModule>());
+                eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+                Debug.Log("[Character] InputSystemUIInputModule added!");
+            }
         }
     }
 }

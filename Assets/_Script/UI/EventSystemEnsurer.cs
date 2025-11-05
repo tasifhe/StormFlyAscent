@@ -1,9 +1,11 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 
 /// <summary>
 /// Ensures an EventSystem exists in the scene for UI input to work
 /// This is CRITICAL for joystick touch input in builds
+/// FIXED: Now uses InputSystemUIInputModule for New Input System
 /// Attach this to any GameObject (like GameManager or Player)
 /// </summary>
 [DefaultExecutionOrder(-100)] // Run before other scripts
@@ -37,13 +39,13 @@ public class EventSystemEnsurer : MonoBehaviour
     {
         GameObject eventSystemObj = new GameObject("EventSystem");
         EventSystem eventSystem = eventSystemObj.AddComponent<EventSystem>();
-        eventSystemObj.AddComponent<StandaloneInputModule>();
+        eventSystemObj.AddComponent<InputSystemUIInputModule>(); // NEW INPUT SYSTEM!
         
         if (persistAcrossScenes)
         {
             DontDestroyOnLoad(eventSystemObj);
         }
         
-        Debug.Log("[EventSystemEnsurer] EventSystem created successfully!");
+        Debug.Log("[EventSystemEnsurer] EventSystem created with InputSystemUIInputModule!");
     }
 }
