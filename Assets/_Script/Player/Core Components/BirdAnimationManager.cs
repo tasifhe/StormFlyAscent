@@ -70,7 +70,11 @@ public class BirdAnimationManager : MonoBehaviour
         
         if (!useAnimancer && animator == null)
         {
-            Debug.LogError("Animator not found on " + gameObject.name);
+            Debug.LogError("❌ Animator not found on " + gameObject.name);
+        }
+        else if (!useAnimancer && animator != null)
+        {
+            Debug.Log($"✓ Animator found on {gameObject.name} - Mode: {(useAnimancer ? "Animancer" : "Animator")}");
         }
     }
     
@@ -140,6 +144,57 @@ public class BirdAnimationManager : MonoBehaviour
             SetAnimatorState("Flying", false);
             SetAnimatorState("Diving", false);
             SetAnimatorState("Gliding", true);
+        }
+    }
+    
+    /// <summary>
+    /// Play flapping animation (for boost)
+    /// </summary>
+    public void PlayFlapping(float fadeDuration = -1f)
+    {
+        Debug.Log($"🦅 PlayFlapping called! useAnimancer: {useAnimancer}, animator: {(animator != null ? "Found" : "NULL")}");
+        
+        if (useAnimancer)
+        {
+            // Use flapping animation if available, otherwise use flying
+            AnimationClip clipToPlay = animationData.flappingAnimation != null 
+                ? animationData.flappingAnimation 
+                : animationData.flyingAnimation;
+            PlayAnimation(clipToPlay, AnimationState.Flying, fadeDuration);
+        }
+        else
+        {
+            // For Animator: ONLY trigger the flap - don't change bool states
+            Debug.Log("📢 Triggering Flap animation via Animator");
+            
+            // Check if animator has the parameter
+            if (animator != null)
+            {
+                bool hasFlap = false;
+                foreach (var param in animator.parameters)
+                {
+                    if (param.name == "Flap")
+                    {
+                        hasFlap = true;
+                        Debug.Log("✓ 'Flap' trigger parameter found in Animator");
+                        break;
+                    }
+                }
+                
+                if (!hasFlap)
+                {
+                    Debug.LogError("❌ 'Flap' trigger parameter NOT FOUND in Animator! Please add it.");
+                    Debug.LogError("   Go to Animator window → Parameters → + → Trigger → Name it 'Flap'");
+                }
+                else
+                {
+                    // ONLY set the trigger - let the Animator handle the transition
+                    SetAnimatorTrigger("Flap");
+                }
+            }
+            
+            // DON'T set bool states here - they might interfere with the trigger
+            // The Flap trigger should handle the transition to Flapping state
         }
     }
     
@@ -257,7 +312,29 @@ public class BirdAnimationManager : MonoBehaviour
     {
         if (animator != null && animator.isActiveAndEnabled)
         {
+            // Log current state
+            var currentStateInfo = animator.GetCurrentAnimatorStateInfo(0);
+            Debug.Log($"📊 Current Animator State: {currentStateInfo.shortNameHash} (normalized time: {currentStateInfo.normalizedTime})");
+            
+            // Reset trigger first to ensure it can be triggered again
+            animator.ResetTrigger(triggerName);
+            // Now set the trigger
             animator.SetTrigger(triggerName);
+            Debug.Log($"✓ Animator Trigger SET: {triggerName}");
+            
+            // Log all active parameters
+            Debug.Log("Current Animator Parameters:");
+            foreach (var param in animator.parameters)
+            {
+                if (param.type == AnimatorControllerParameterType.Bool)
+                    Debug.Log($"   {param.name} (Bool): {animator.GetBool(param.name)}");
+                else if (param.type == AnimatorControllerParameterType.Trigger)
+                    Debug.Log($"   {param.name} (Trigger): {animator.GetBool(param.name)}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"⚠️ Cannot set trigger '{triggerName}' - Animator is null or inactive!");
         }
     }
     

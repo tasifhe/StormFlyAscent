@@ -64,7 +64,7 @@ public class BirdPathFollower : Runner
         physicsMode = PhysicsMode.Rigidbody;
         updateMode = UpdateMode.FixedUpdate;
         startMode = StartMode.Project; // Start by projecting bird's current position
-        follow = true;
+        follow = false; // DON'T auto-follow - wait for GameStartManager
         isPlayer = true;
         
         // Set initial speed from Character
@@ -81,52 +81,43 @@ public class BirdPathFollower : Runner
         // Configure offset
         _motion.offset = Vector2.zero; // We'll update this dynamically
         _motion.useSplineSizes = false;
-        
-        // Subscribe to LevelGenerator ready event for immediate start
-        if (LevelGenerator.instance != null)
-        {
-            LevelGenerator.onReady += OnLevelGeneratorReady;
-        }
     }
     
     private void Start()
     {
-        // Start following immediately if already ready
-        if (LevelGenerator.instance != null && LevelGenerator.instance.ready)
-        {
-            StartFollow();
-            Debug.Log("BirdPathFollower: Started following Forever path!");
-        }
+        // GameStartManager will call StartFollow() when ready
+        // Don't auto-start to prevent bird falling
+        Debug.Log("BirdPathFollower: Waiting for GameStartManager to start...");
     }
     
-    private void OnDestroy()
+    /// <summary>
+    /// Start following the path (called by GameStartManager)
+    /// </summary>
+    public void StartFollow()
     {
-        // Unsubscribe from event
-        if (LevelGenerator.instance != null)
-        {
-            LevelGenerator.onReady -= OnLevelGeneratorReady;
-        }
+        follow = true;
+        Debug.Log("✅ BirdPathFollower: Started following path!");
     }
     
-    private void OnLevelGeneratorReady()
+    /// <summary>
+    /// Stop following the path
+    /// </summary>
+    public void StopFollow()
     {
-        // Start following immediately when level becomes ready
-        if (!follow)
-        {
-            StartFollow();
-            Debug.Log("BirdPathFollower: Level ready - Started following Forever path immediately!");
-        }
+        follow = false;
+        Debug.Log("⏸️ BirdPathFollower: Stopped following path");
     }
     
     protected override void Update()
     {
         base.Update(); // Call Runner's update
         
-        // Update speed from character
-        if (character != null)
-        {
-            followSpeed = character.forwardSpeed;
-        }
+        // DON'T update speed from character here - FlyingState controls it directly
+        // This was overriding the boost speed every frame!
+        // if (character != null)
+        // {
+        //     followSpeed = character.forwardSpeed;
+        // }
         
         // Smooth lateral offset with improved easing
         smoothedLateralOffset = Mathf.SmoothDamp(smoothedLateralOffset, targetLateralOffset, ref lateralVelocity, 1f / offsetSmoothSpeed);

@@ -1154,8 +1154,9 @@ MonoBehaviour:
   loadingPercentageText: {fileID: 1740568481}
   loadingTipText: {fileID: 1431050871}
   fadeImage: {fileID: 1825006730}
-  minimumLoadingTime: 1
   fadeDuration: 0.5
+  keepLoadingPanelForLevelGen: 1
+  mainMenuManager: {fileID: 1888703356}
   loadingTips:
   - 'Tip: Use joystick to steer your bird left and right'
   - 'Tip: Tap the screen to boost your speed'
@@ -1918,9 +1919,97 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1176843133475782950, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_MatchWidthOrHeight
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1440587474218151042, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1982483151866424047, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1982483151866424047, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1982483151866424047, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1982483151866424047, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3427688640718184289, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3427688640718184289, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3427688640718184289, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3427688640718184289, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3477150551549736392, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3736414311797574008, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3736414311797574008, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5278422011740703834, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5278422011740703834, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5278422011740703834, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5278422011740703834, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5915104633439979255, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5915104633439979255, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5915104633439979255, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5915104633439979255, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6429828871999595431, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
       propertyPath: m_Name
       value: Canvas
+      objectReference: {fileID: 0}
+    - target: {fileID: 6429828871999595431, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8130465708564929182, guid: d459ae20f17a17547bab5701401e0c04, type: 3}
       propertyPath: m_Pivot.x

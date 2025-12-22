@@ -1,0 +1,17 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Animancer.FSM.csproj" />
+  <Project Path="Dreamteck.Forever.Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Animancer.csproj" />
+  <Project Path="Hierarchy2.Editor.csproj" />
+  <Project Path="Animancer.Examples.csproj" />
+  <Project Path="Dreamteck.Forever.csproj" />
+  <Project Path="Dreamteck.Splines.Editor.csproj" />
+  <Project Path="Dreamteck.Utilities.Editor.csproj" />
+  <Project Path="Assembly-CSharp-firstpass.csproj" />
+  <Project Path="Dreamteck.Utilities.csproj" />
+  <Project Path="Dreamteck.Splines.csproj" />
+  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
+  <Project Path="Hierarchy2.Runtime.csproj" />
+</Solution>

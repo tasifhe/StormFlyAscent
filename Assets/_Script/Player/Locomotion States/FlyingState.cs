@@ -6,37 +6,32 @@ using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 /// <summary>
 /// FlyingState - AC-style bird flight with joystick (left/right, up/down) and tap-to-flap boost
-/// Updated to use New Input System
+/// Refactored to use modular systems
 /// </summary>
 public class FlyingState : State
 {
     // Input references
-    private DynamicJoystick joystick;           // For joystick input
-    private BirdPathFollower pathFollower;       // Reference to path follower
+    private DynamicJoystick joystick;
+    private BirdPathFollower pathFollower;
+    
+    // Modular systems
+    private BoostSystem boostSystem;
+    private BoostInputDetector inputDetector;
+    private FlightSpeedController speedController;
     
     // Input smoothing for AC-style responsiveness
     private Vector3 smoothedInput = Vector3.zero;
     private Vector3 inputVelocity = Vector3.zero;
     
-    // Speed management
-    private float currentSpeedMultiplier = 1f;
-    private float targetSpeedMultiplier = 1f;
-    private float previousAltitude = 0f;
-    
-    // Flap boost mechanic (replaces dive)
-    private bool isFlapBoosting = false;         // Currently boosting from flap
-    private float flapBoostTimer = 0f;           // Tracks boost duration
-    private float flapCooldownTimer = 0f;        // Tracks cooldown between flaps
-    
     // Auto gliding mechanic variables
-    private bool isGliding = false;              // Currently in gliding phase
-    private float flightTimer = 0f;              // Tracks time in current flight phase
+    private bool isGliding = false;
+    private float flightTimer = 0f;
     
     // Movement tracking
-    private float currentLateralPosition = 0f;   // Track left/right position from center
-    private float currentVerticalOffset = 0f;    // Track up/down position from path
-    private float lateralVelocity = 0f;          // Smooth lateral movement
-    private float verticalVelocity = 0f;         // Smooth vertical movement
+    private float currentLateralPosition = 0f;
+    private float currentVerticalOffset = 0f;
+    private float lateralVelocity = 0f;
+    private float verticalVelocity = 0f;
 
     public FlyingState(Character _character, StateMachine _stateMachine) : base(_character, _stateMachine)
     {
@@ -48,44 +43,48 @@ public class FlyingState : State
     {
         base.Enter();
         
-        // Enable enhanced touch support for mobile (New Input System)
-        EnhancedTouchSupport.Enable();
-        TouchSimulation.Enable(); // For testing in editor
+        // Use cached modular systems from Character (Performance optimization)
+        boostSystem = character.boostSystem;
+        inputDetector = character.boostInputDetector;
+        speedController = character.flightSpeedController;
+        pathFollower = character.birdPathFollower;
+        joystick = character.dynamicJoystick;
         
-        isFlapBoosting = false;
-        flapBoostTimer = 0f;
-        flapCooldownTimer = 0f;
+        // Validate critical components
+        if (boostSystem == null)
+            Debug.LogWarning("⚠️ BoostSystem not found on Character!");
+        if (inputDetector == null)
+            Debug.LogWarning("⚠️ BoostInputDetector not found on Character!");
+        if (speedController == null)
+            Debug.LogWarning("⚠️ FlightSpeedController not found on Character!");
+        if (pathFollower == null)
+            Debug.LogError("❌ BirdPathFollower NOT FOUND! Movement will not work!");
+        else
+            Debug.Log($"✓ BirdPathFollower found! Current speed: {pathFollower.followSpeed}");
         
-        // Start with active flying (flapping)
+        if (joystick != null)
+            Debug.Log("Joystick found - AC-style controls active");
+        else
+            Debug.Log("No joystick - using keyboard (WASD/Arrows + Space for boost)");
+        
+        // Subscribe to boost input
+        if (inputDetector != null)
+        {
+            inputDetector.OnBoostInputDetected += OnBoostInput;
+        }
+        
+        // Start with active flying (not gliding)
         isGliding = false;
         flightTimer = 0f;
         
         // Reset smooth values
         smoothedInput = Vector3.zero;
         inputVelocity = Vector3.zero;
-        currentSpeedMultiplier = 1f;
-        targetSpeedMultiplier = 1f;
         lateralVelocity = 0f;
         verticalVelocity = 0f;
         
         currentLateralPosition = 0f;
         currentVerticalOffset = 0f;
-        previousAltitude = character.transform.position.y;
-
-        // Get path follower reference
-        pathFollower = character.GetComponent<BirdPathFollower>();
-
-        // Find joystick
-        joystick = UnityEngine.Object.FindFirstObjectByType<DynamicJoystick>();
-        
-        if (joystick != null)
-        {
-            Debug.Log("Joystick found - AC-style controls active (Left/Right + Up/Down, Tap for boost)");
-        }
-        else
-        {
-            Debug.Log("No joystick - using keyboard (WASD/Arrows + Space for boost)");
-        }
     }
 
     /// <summary>
@@ -102,7 +101,6 @@ public class FlyingState : State
         // ===== JOYSTICK INPUT (Works with BOTH touch AND mouse!) =====
         if (joystick != null)
         {
-            // Joystick works with touch on mobile and mouse in editor
             Vector2 joystickInput = new Vector2(joystick.Horizontal, joystick.Vertical);
             if (joystickInput.sqrMagnitude > 0.01f)
             {
@@ -110,7 +108,7 @@ public class FlyingState : State
             }
         }
         
-        // ===== KEYBOARD INPUT (Always works, can combine with joystick) =====
+        // ===== KEYBOARD INPUT =====
         if (Keyboard.current != null)
         {
             float horizontal = 0f;
@@ -121,7 +119,6 @@ public class FlyingState : State
             if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vertical += 1f;
             if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vertical -= 1f;
             
-            // Add keyboard input to rawInput (combines with joystick)
             Vector2 keyboardInput = new Vector2(horizontal, vertical);
             if (keyboardInput.sqrMagnitude > 0.01f)
             {
@@ -129,105 +126,41 @@ public class FlyingState : State
             }
         }
         
-        // ===== GAMEPAD INPUT (Always works, can combine with others) =====
+        // ===== GAMEPAD INPUT =====
         if (Gamepad.current != null)
         {
             Vector2 stickInput = Gamepad.current.leftStick.ReadValue();
             if (stickInput.sqrMagnitude > 0.01f)
             {
-                // Add gamepad input to rawInput
                 rawInput += new Vector3(stickInput.x, stickInput.y, 0f);
             }
         }
         
-        // Clamp combined input to prevent overly fast movement
+        // Clamp combined input
         if (rawInput.sqrMagnitude > 1f)
         {
             rawInput = rawInput.normalized;
         }
         
         // ===== SMOOTH INPUT FOR AC-STYLE FEEL =====
-        // Use SmoothDamp for natural acceleration/deceleration
         float smoothTime = 1f / character.inputResponsiveness;
         smoothedInput = Vector3.SmoothDamp(smoothedInput, rawInput, ref inputVelocity, smoothTime);
         
         // Apply smoothed input
         character.inputDirection = smoothedInput;
-
-        // ===== TAP-TO-FLAP BOOST INPUT =====
-        DetectFlapBoostInput();
+        
+        // Note: Boost input is now handled by BoostInputDetector
     }
-
+    
     /// <summary>
-    /// Detect tap input for flap boost - ALL INPUTS WORK!
-    /// Touch (mobile) + Mouse Click + Space Bar + Gamepad Button
+    /// Callback when boost input is detected
     /// </summary>
-    private void DetectFlapBoostInput()
+    private void OnBoostInput()
     {
-        bool tapDetected = false;
-
-        // ===== TOUCH INPUT (Mobile) =====
-        if (Touch.activeTouches.Count > 0)
+        if (boostSystem != null)
         {
-            Touch touch = Touch.activeTouches[0];
-            
-            if (touch.phase == TouchPhase.Began)
-            {
-                // Make sure touch isn't on the joystick area
-                if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
-                    joystick.GetComponent<RectTransform>(), touch.screenPosition))
-                {
-                    tapDetected = true;
-                }
-            }
+            boostSystem.TryActivateBoost();
         }
-        
-        // ===== MOUSE INPUT (Editor/PC) =====
-        // Click anywhere except UI to flap
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            // Make sure click isn't on the joystick area
-            Vector2 mousePos = Mouse.current.position.ReadValue();
-            if (joystick == null || !RectTransformUtility.RectangleContainsScreenPoint(
-                joystick.GetComponent<RectTransform>(), mousePos))
-            {
-                tapDetected = true;
-            }
-        }
-        
-        // ===== KEYBOARD INPUT (Space bar) =====
-        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-        {
-            tapDetected = true;
-        }
-        
-        // ===== GAMEPAD INPUT (A/X button) =====
-        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
-        {
-            tapDetected = true;
-        }
-
-        // Execute flap boost if tap detected and cooldown ready
-        if (tapDetected && flapCooldownTimer <= 0f && !isFlapBoosting)
-        {
-            StartFlapBoost();
-        }
-    }
-
-    /// <summary>
-    /// Initialize flap boost mechanic (AC-style speed burst)
-    /// </summary>
-    private void StartFlapBoost()
-    {
-        isFlapBoosting = true;
-        flapBoostTimer = character.flapBoostDuration;
-        flapCooldownTimer = character.flapCooldown;
-        
-        // Reset gliding timer - flapping resets the cycle
-        isGliding = false;
-        flightTimer = 0f;
-        
-        Debug.Log("Flap boost activated! 🦅");
     }
 
     /// <summary>
@@ -238,26 +171,9 @@ public class FlyingState : State
     {
         base.LogicUpdate();
 
-        // Update flap boost timer
-        if (isFlapBoosting)
-        {
-            flapBoostTimer -= Time.deltaTime;
-            if (flapBoostTimer <= 0f)
-            {
-                isFlapBoosting = false;
-                Debug.Log("Flap boost ended");
-            }
-        }
-
-        // Update cooldown timer
-        if (flapCooldownTimer > 0f)
-        {
-            flapCooldownTimer -= Time.deltaTime;
-        }
-        
         // ===== AUTO FLYING/GLIDING TRANSITION =====
-        // Don't auto-transition while flap boosting
-        if (!isFlapBoosting)
+        // Don't auto-transition while boost is active
+        if (boostSystem != null && !boostSystem.IsBoosting)
         {
             flightTimer += Time.deltaTime;
             
@@ -283,40 +199,14 @@ public class FlyingState : State
             }
         }
         
-        // ===== DYNAMIC SPEED CALCULATION (AC-STYLE) =====
-        // Calculate altitude change
-        float currentAltitude = character.transform.position.y;
-        float altitudeChange = (currentAltitude - previousAltitude) / Time.deltaTime;
-        previousAltitude = currentAltitude;
-        
-        // Determine target speed multiplier based on state
-        if (isFlapBoosting)
+        // ===== UPDATE SPEED via FlightSpeedController =====
+        if (speedController != null)
         {
-            targetSpeedMultiplier = character.flapSpeedMultiplier;
-        }
-        else if (isGliding)
-        {
-            targetSpeedMultiplier = character.glideSpeedMultiplier;
-        }
-        else
-        {
-            targetSpeedMultiplier = 1f;
-        }
-        
-        // Add altitude influence (descending = faster, climbing = slower)
-        float altitudeSpeedMod = -altitudeChange * character.altitudeSpeedInfluence * 0.01f;
-        targetSpeedMultiplier += altitudeSpeedMod;
-        
-        // Clamp speed multiplier to reasonable range
-        targetSpeedMultiplier = Mathf.Clamp(targetSpeedMultiplier, 0.5f, 2.5f);
-        
-        // Smooth transition to target speed
-        currentSpeedMultiplier = Mathf.Lerp(currentSpeedMultiplier, targetSpeedMultiplier, Time.deltaTime * 2f);
-        
-        // Apply speed to path follower
-        if (pathFollower != null)
-        {
-            pathFollower.followSpeed = character.forwardSpeed * currentSpeedMultiplier;
+            FlightSpeedController.FlightMode mode = isGliding 
+                ? FlightSpeedController.FlightMode.Gliding 
+                : FlightSpeedController.FlightMode.Normal;
+                
+            speedController.UpdateSpeed(mode);
         }
     }
 
@@ -416,19 +306,20 @@ public class FlyingState : State
         dragForce.z *= 0.1f; // Less drag on forward movement
         character.rb.AddForce(dragForce, ForceMode.Force);
 
-        // ===== FLAP BOOST MECHANIC (AC-STYLE) =====
-        if (isFlapBoosting)
+        // ===== BOOST PHYSICS =====
+        if (boostSystem != null)
         {
-            // Apply forward boost force
-            Vector3 boostDirection = character.transform.forward;
-            character.rb.AddForce(boostDirection * character.flapBoostForce, ForceMode.Acceleration);
+            boostSystem.ApplyBoostPhysics();
         }
-        else if (isGliding)
+        
+        // ===== GLIDING LIFT =====
+        if (isGliding && !boostSystem.IsBoosting)
         {
             // Subtle lift during gliding for realistic flight
             character.rb.AddForce(Vector3.up * 2f, ForceMode.Force);
         }
 
+        // Note: Forward speed boost is handled by BoostSystem
         // Note: Rotation is handled by BirdPathFollower which aligns bird with path direction
     }
 
@@ -441,10 +332,11 @@ public class FlyingState : State
 
         if (character.animationManager != null)
         {
-            if (isFlapBoosting)
+            // Boost animation is handled by BoostSystem events
+            // Just handle gliding vs flying here
+            if (boostSystem != null && boostSystem.IsBoosting)
             {
-                // Use flying animation during flap boost (active flapping)
-                character.animationManager.PlayFlying();
+                // Keep flapping animation during boost - don't override it!
             }
             else if (isGliding)
             {
@@ -460,6 +352,11 @@ public class FlyingState : State
     public override void Exit()
     {
         base.Exit();
-        isFlapBoosting = false;
+        
+        // Unsubscribe from boost input
+        if (inputDetector != null)
+        {
+            inputDetector.OnBoostInputDetected -= OnBoostInput;
+        }
     }
 }

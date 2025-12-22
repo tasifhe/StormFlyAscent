@@ -17,8 +17,8 @@ public class Character : MonoBehaviour
     public float forwardSpeed = 10f;          // Constant forward movement speed
     public float moveSpeed = 5f;              // Lateral (left/right) movement sensitivity
     public float verticalSpeed = 3f;          // Vertical (up/down) movement sensitivity
-    public float flapBoostForce = 20f;        // Speed boost when tapping to flap
-    public float flapBoostDuration = 0.3f;    // How long flap boost lasts
+    public float flapBoostForce = 50f;        // Speed boost when tapping to flap (increased from 20)
+    public float flapBoostDuration = 0.5f;    // How long flap boost lasts (increased from 0.3)
     public float flapCooldown = 0.8f;         // Cooldown between flaps
     public float maxLateralDistance = 5f;     // Max distance bird can move left/right from center
     public float maxVerticalOffset = 5f;      // Max distance bird can move up/down from path
@@ -73,16 +73,72 @@ public class Character : MonoBehaviour
     public Rigidbody rb;
     [HideInInspector]
     public BirdAnimationManager animationManager;
+    
+    // Cached modular systems (Performance optimization - avoid GetComponent in Enter())
+    [HideInInspector]
+    public BoostSystem boostSystem;
+    [HideInInspector]
+    public BoostInputDetector boostInputDetector;
+    [HideInInspector]
+    public FlightSpeedController flightSpeedController;
+    [HideInInspector]
+    public BirdPathFollower birdPathFollower;
+    [HideInInspector]
+    public DynamicJoystick dynamicJoystick;
 
 
     private void Start()
     {
+        // Check if GameStartManager exists - if so, it will handle initialization
+        GameStartManager gameStartManager = FindFirstObjectByType<GameStartManager>();
+        if (gameStartManager != null)
+        {
+            Debug.Log("✓ GameStartManager found - waiting for initialization...");
+            // GameStartManager will enable us when ready
+            // Don't initialize state machine yet
+            return;
+        }
+        
+        // No GameStartManager - initialize normally (for testing/other scenes)
+        InitializeCharacter();
+    }
+    
+    /// <summary>
+    /// Initialize the character (called by Start or GameStartManager)
+    /// </summary>
+    public void InitializeCharacter()
+    {
         // CRITICAL: Ensure EventSystem exists for joystick touch input
         EnsureEventSystem();
         
+        // Cache core components
         rb = GetComponent<Rigidbody>();
-        //animationManager = GetComponent<BirdAnimationManager>();
         
+        // Cache modular systems (Performance optimization)
+        boostSystem = GetComponent<BoostSystem>();
+        boostInputDetector = GetComponent<BoostInputDetector>();
+        flightSpeedController = GetComponent<FlightSpeedController>();
+        birdPathFollower = GetComponent<BirdPathFollower>();
+        
+        // Find joystick in scene
+        dynamicJoystick = FindFirstObjectByType<DynamicJoystick>();
+        
+        // Get or assign animation manager
+        if (animationManager == null)
+        {
+            animationManager = GetComponent<BirdAnimationManager>();
+            if (animationManager == null)
+            {
+                Debug.LogWarning("⚠️ BirdAnimationManager not found on Character! Flapping animation won't work.");
+            }
+            else
+            {
+                Debug.Log("✓ BirdAnimationManager found and assigned!");
+            }
+        }
+        
+        // Log what we found
+        Debug.Log($"[Character] Cached components: BoostSystem={boostSystem != null}, InputDetector={boostInputDetector != null}, SpeedController={flightSpeedController != null}, PathFollower={birdPathFollower != null}, Joystick={dynamicJoystick != null}");
 
         movementSM = new StateMachine();
         

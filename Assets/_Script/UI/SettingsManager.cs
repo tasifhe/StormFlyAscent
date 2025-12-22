@@ -327,6 +327,54 @@ public class SettingsManager : MonoBehaviour
         return PlayerPrefs.GetInt(VIBRATION_KEY, 1) == 1;
     }
     
+    /// <summary>
+    /// Get current music volume
+    /// </summary>
+    public float GetMusicVolume()
+    {
+        return PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, 0.8f);
+    }
+    
+    /// <summary>
+    /// Get current SFX volume
+    /// </summary>
+    public float GetSFXVolume()
+    {
+        return PlayerPrefs.GetFloat(SFX_VOLUME_KEY, 1f);
+    }
+    
+    /// <summary>
+    /// Set music volume
+    /// </summary>
+    public void SetMusicVolume(float value)
+    {
+        PlayerPrefs.SetFloat(MUSIC_VOLUME_KEY, value);
+        if (musicVolumeSlider != null)
+            musicVolumeSlider.value = value;
+        OnMusicVolumeChanged(value);
+    }
+    
+    /// <summary>
+    /// Set SFX volume
+    /// </summary>
+    public void SetSFXVolume(float value)
+    {
+        PlayerPrefs.SetFloat(SFX_VOLUME_KEY, value);
+        if (sfxVolumeSlider != null)
+            sfxVolumeSlider.value = value;
+        OnSFXVolumeChanged(value);
+    }
+    
+    /// <summary>
+    /// Set vibration enabled/disabled
+    /// </summary>
+    public void SetVibration(bool enabled)
+    {
+        PlayerPrefs.SetInt(VIBRATION_KEY, enabled ? 1 : 0);
+        if (vibrationToggle != null)
+            vibrationToggle.isOn = enabled;
+    }
+    
     #endregion
     
     #region Button Callbacks
