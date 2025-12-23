@@ -176,20 +176,32 @@ public class Character : MonoBehaviour
             GameObject eventSystemObj = new GameObject("EventSystem");
             eventSystemObj.AddComponent<EventSystem>();
             eventSystemObj.AddComponent<InputSystemUIInputModule>(); // NEW INPUT SYSTEM!
+            DontDestroyOnLoad(eventSystemObj); // Persist across scenes
             Debug.Log("[Character] EventSystem created with InputSystemUIInputModule!");
         }
         else
         {
             Debug.Log("[Character] EventSystem found: " + eventSystem.gameObject.name);
             
-            // Check if it has the correct input module
-            if (eventSystem.GetComponent<InputSystemUIInputModule>() == null && 
-                eventSystem.GetComponent<StandaloneInputModule>() != null)
+            // ALWAYS remove StandaloneInputModule if it exists
+            StandaloneInputModule oldModule = eventSystem.GetComponent<StandaloneInputModule>();
+            if (oldModule != null)
             {
-                Debug.LogWarning("[Character] EventSystem has OLD StandaloneInputModule! Replacing with InputSystemUIInputModule...");
-                Destroy(eventSystem.GetComponent<StandaloneInputModule>());
+                Debug.LogWarning("[Character] Removing OLD StandaloneInputModule!");
+                DestroyImmediate(oldModule); // Use DestroyImmediate to ensure it's gone NOW
+            }
+            
+            // Add InputSystemUIInputModule if missing
+            InputSystemUIInputModule newModule = eventSystem.GetComponent<InputSystemUIInputModule>();
+            if (newModule == null)
+            {
+                Debug.LogWarning("[Character] Adding InputSystemUIInputModule...");
                 eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
                 Debug.Log("[Character] InputSystemUIInputModule added!");
+            }
+            else
+            {
+                Debug.Log("[Character] InputSystemUIInputModule already present - touch input ready!");
             }
         }
     }

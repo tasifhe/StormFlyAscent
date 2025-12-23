@@ -1155,6 +1155,8 @@ MonoBehaviour:
   loadingTipText: {fileID: 1431050871}
   fadeImage: {fileID: 1825006730}
   fadeDuration: 0.5
+  minimumLoadingTime: 2
+  additionalDisplayTime: 0.5
   keepLoadingPanelForLevelGen: 1
   mainMenuManager: {fileID: 1888703356}
   loadingTips:
@@ -1708,7 +1710,7 @@ MonoBehaviour:
   panelEaseIn: 27
   panelEaseOut: 26
   panelStartScale: {x: 0.8, y: 0.8, z: 1}
-  buttonHoverScale: 1.1
+  buttonHoverScale: 1
   hideOnStart: 1
   buttonClickSound: {fileID: 0}
   panelOpenSound: {fileID: 0}

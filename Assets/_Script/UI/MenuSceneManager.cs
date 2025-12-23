@@ -22,6 +22,8 @@ public class MenuSceneManager : MonoBehaviour
     
     [Header("Loading Settings")]
     [SerializeField] private float fadeDuration = 0.5f;
+    [SerializeField] private float minimumLoadingTime = 1.5f; // Minimum time to show loading panel
+    [SerializeField] private float additionalDisplayTime = 0.5f; // Extra time to show panel after loading completes
     [SerializeField] private bool keepLoadingPanelForLevelGen = true; // Keep panel visible for level generation
     
     [Header("Menu References")]
@@ -387,8 +389,8 @@ public class MenuSceneManager : MonoBehaviour
         AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
         asyncLoad.allowSceneActivation = false;
         
-        // Show loading progress (minimum 1.5 seconds)
-        while (asyncLoad.progress < 0.9f || (Time.time - loadStartTime) < 1.5f)
+        // Show loading progress (use configured minimum time)
+        while (asyncLoad.progress < 0.9f || (Time.time - loadStartTime) < minimumLoadingTime)
         {
             float progress = asyncLoad.progress / 0.9f;
             UpdateLoadingUI(progress * 0.5f); // 0-50%
@@ -481,7 +483,7 @@ public class MenuSceneManager : MonoBehaviour
         if (loadingPercentageText != null)
             loadingPercentageText.text = "Initializing... 60%";
         
-        Debug.Log("Waiting for LevelGenerator to be ready...");
+        Debug.Log("Waiting for LevelGenerator and BirdController to be ready...");
         
         float totalWaitStart = Time.time;
         float maxWaitTime = 8f; // Maximum 8 seconds total wait
@@ -544,9 +546,9 @@ public class MenuSceneManager : MonoBehaviour
                 break;
             }
             
-            // Show smooth progress 65-90% over max 5 seconds
+            // Show smooth progress 65-80% over max 5 seconds
             float elapsed = Time.time - waitStart;
-            float progress = 0.65f + (Mathf.Min(elapsed / 5f, 1f) * 0.25f);
+            float progress = 0.65f + (Mathf.Min(elapsed / 5f, 1f) * 0.15f);
             UpdateLoadingUI(progress);
             
             if (loadingPercentageText != null)
@@ -562,7 +564,55 @@ public class MenuSceneManager : MonoBehaviour
             }
         }
         
-        Debug.Log("LevelGenerator ready, finishing loading sequence");
+        Debug.Log("LevelGenerator ready, now waiting for BirdController...");
+        
+        UpdateLoadingUI(0.8f);
+        if (loadingPercentageText != null)
+            loadingPercentageText.text = "Finding Bird Controller... 80%";
+        
+        // Wait for Character (bird) to be ready
+        Character birdCharacter = null;
+        waitStart = Time.time;
+        while (birdCharacter == null)
+        {
+            birdCharacter = FindFirstObjectByType<Character>();
+            
+            float totalElapsed = Time.time - totalWaitStart;
+            if (totalElapsed > maxWaitTime)
+            {
+                Debug.LogWarning("Max wait exceeded for Bird Character, finishing anyway");
+                break;
+            }
+            
+            if (Time.time - waitStart > 2f)
+            {
+                Debug.LogWarning("Bird Character not found after 2 seconds, but continuing...");
+                break;
+            }
+            
+            yield return null;
+        }
+        
+        if (birdCharacter != null)
+        {
+            Debug.Log("Found Bird Character, waiting for initialization...");
+            UpdateLoadingUI(0.85f);
+            if (loadingPercentageText != null)
+                loadingPercentageText.text = "Initializing Bird... 85%";
+            
+            // Give bird character a moment to initialize
+            yield return new WaitForSeconds(0.3f);
+            
+            UpdateLoadingUI(0.9f);
+            if (loadingPercentageText != null)
+                loadingPercentageText.text = "Ready to fly... 90%";
+        }
+        else
+        {
+            Debug.LogWarning("Bird Character not found, but proceeding to finish loading");
+        }
+        
+        Debug.Log("Level and Bird ready, finishing loading sequence");
         
         // Finish loading sequence
         Debug.Log("=== Calling FinishLoading ===");
@@ -591,7 +641,7 @@ public class MenuSceneManager : MonoBehaviour
         if (loadingPercentageText != null)
             loadingPercentageText.text = "Starting... 100%";
         
-        yield return new WaitForSeconds(0.3f);
+        yield return new WaitForSeconds(additionalDisplayTime);
         
         Debug.Log("FinishLoading: Second wait complete, starting fade");
         

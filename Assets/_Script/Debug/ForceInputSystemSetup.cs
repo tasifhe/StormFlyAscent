@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.EnhancedTouch;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 /// <summary>
@@ -13,8 +15,14 @@ public class ForceInputSystemSetup : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool showDebugLogs = true;
     
+    [Header("Auto-fix EventSystem")]
+    [SerializeField] private bool autoFixEventSystem = true;
+    
     private void Awake()
     {
+        // Persist this across scenes
+        DontDestroyOnLoad(gameObject);
+        
         // Force enable Enhanced Touch Support
         if (!EnhancedTouchSupport.enabled)
         {
@@ -46,10 +54,49 @@ public class ForceInputSystemSetup : MonoBehaviour
             Debug.Log($"[ForceInputSystemSetup] Input System Backend: {InputSystem.settings?.updateMode ?? InputSettings.UpdateMode.ProcessEventsInDynamicUpdate}");
             Debug.Log($"[ForceInputSystemSetup] Enhanced Touch Enabled: {EnhancedTouchSupport.enabled}");
         }
+        
+        // Fix EventSystem if needed
+        if (autoFixEventSystem)
+        {
+            FixEventSystem();
+        }
+    }
+    
+    private void FixEventSystem()
+    {
+        EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
+        
+        if (eventSystem != null)
+        {
+            // Remove old input module
+            StandaloneInputModule oldModule = eventSystem.GetComponent<StandaloneInputModule>();
+            if (oldModule != null)
+            {
+                if (showDebugLogs)
+                    Debug.LogWarning("[ForceInputSystemSetup] Removing OLD StandaloneInputModule from EventSystem!");
+                DestroyImmediate(oldModule);
+            }
+            
+            // Add new input module if missing
+            InputSystemUIInputModule newModule = eventSystem.GetComponent<InputSystemUIInputModule>();
+            if (newModule == null)
+            {
+                eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+                if (showDebugLogs)
+                    Debug.Log("[ForceInputSystemSetup] Added InputSystemUIInputModule to EventSystem!");
+            }
+        }
     }
     
     private void Update()
     {
+        // Continuously ensure Enhanced Touch stays enabled
+        if (!EnhancedTouchSupport.enabled)
+        {
+            EnhancedTouchSupport.Enable();
+            Debug.LogWarning("[ForceInputSystemSetup] Re-enabled Enhanced Touch Support!");
+        }
+        
         // Debug touch info every 2 seconds
         if (showDebugLogs && Time.frameCount % 120 == 0)
         {
