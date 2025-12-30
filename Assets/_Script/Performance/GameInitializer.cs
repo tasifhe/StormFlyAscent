@@ -56,14 +56,8 @@ public class GameInitializer : MonoBehaviour
         {
             CreateFPSCounter();
         }
-        
-        // 3. Create Mobile Optimization Manager
-        if (enableOptimizations)
-        {
-            CreateOptimizationManager();
-        }
-        
-        // 4. Create Object Pool
+
+        // 3. Create Object Pool
         if (enableObjectPooling)
         {
             CreateObjectPool();
@@ -109,23 +103,6 @@ public class GameInitializer : MonoBehaviour
         if (showInitLogs)
         {
             Debug.Log("[GameInitializer] ✅ FPS Counter created (Press F1 to toggle)");
-        }
-    }
-    
-    private void CreateOptimizationManager()
-    {
-        GameObject optObject = new GameObject("OptimizationManager");
-        optObject.transform.SetParent(transform);
-        MobileOptimizationManager optManager = optObject.AddComponent<MobileOptimizationManager>();
-        
-        // Configure settings
-        optManager.GetType().GetField("unlockFrameRate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(optManager, true);
-        optManager.GetType().GetField("targetFrameRate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(optManager, targetFPS);
-        optManager.GetType().GetField("disableVSync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(optManager, disableVSync);
-        
-        if (showInitLogs)
-        {
-            Debug.Log("[GameInitializer] ✅ Optimization Manager created");
         }
     }
     
