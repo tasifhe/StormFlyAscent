@@ -8,7 +8,7 @@ namespace Dreamteck.Forever
 
     public class MathCamera : MonoBehaviour
     {
-        public LaneRunner runner;
+        public Runner runner;
         SplineSample evalResult = new SplineSample();
         Transform trs;
         public float cameraDistance = 10f;

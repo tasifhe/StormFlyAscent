@@ -1,91 +1,20 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
-using TMPro;
-using Animancer;
 
 public class Character : MonoBehaviour
 {
-    [Header("Ground Movement Controls")]
-    public float playerSpeed = 5.0f;
-    [Space(10)]
-    public float rotationSpeed = 5f;
-    [Space(10)]
-
-    [Header("Flying Controls")]
-    public float forwardSpeed = 10f;          // Constant forward movement speed
-    public float moveSpeed = 5f;              // Lateral (left/right) movement sensitivity
-    public float verticalSpeed = 3f;          // Vertical (up/down) movement sensitivity
-    public float flapBoostForce = 50f;        // Speed boost when tapping to flap (increased from 20)
-    public float flapBoostDuration = 0.5f;    // How long flap boost lasts (increased from 0.3)
-    public float flapCooldown = 0.8f;         // Cooldown between flaps
-    public float maxLateralDistance = 5f;     // Max distance bird can move left/right from center
-    public float maxVerticalOffset = 5f;      // Max distance bird can move up/down from path
-    
-    [Header("Flight Smoothness (AC-Style)")]
-    [Tooltip("How quickly input responds (lower = smoother, more momentum)")]
-    [Range(1f, 20f)]
-    public float inputResponsiveness = 8f;
-    [Tooltip("Speed boost multiplier when flapping")]
-    [Range(1f, 3f)]
-    public float flapSpeedMultiplier = 1.8f;
-    [Tooltip("Speed reduction multiplier when gliding")]
-    [Range(0.5f, 1f)]
-    public float glideSpeedMultiplier = 0.85f;
-    [Tooltip("How much altitude change affects speed")]
-    [Range(0f, 5f)]
-    public float altitudeSpeedInfluence = 1.5f;
-    [Tooltip("Drag coefficient for smooth deceleration")]
-    [Range(0f, 5f)]
-    public float airDrag = 1.2f;
-    [Tooltip("Maximum turn rate (degrees per second)")]
-    [Range(10f, 180f)]
-    public float maxTurnRate = 90f;
-    
-    [Header("Flight Animation Timing")]
-    [Tooltip("How long the bird actively flaps its wings before gliding")]
-    public float flyingDuration = 3f;
-    [Tooltip("How long the bird glides passively before flapping again")]
-    public float glidingDuration = 2f;
-
-    [Header("Animation Smoothing")]
-    [Range(0, 1)]
-    public float speedDampTime = 0.1f;    
-    [Range(0, 1)]
-    public float airControl = 0.5f;
-
-    //States
+    // State Machine
     public StateMachine movementSM;
-    public FlyingState flyingState;
-    
+    public BirdFlyingState flyingState;
 
-    [HideInInspector]
-    public float gravityValue = -9.81f;
-    [HideInInspector] 
-    public Vector3 playerVelocity;
-    [HideInInspector]
-    public bool isGrounded;
+    // Core components
     [HideInInspector]
     public Vector3 inputDirection;
 
+    // Component references (cached for performance)
     [HideInInspector]
-    public Rigidbody rb;
+    public CharacterPathFollower pathFollower;
     [HideInInspector]
-    public BirdAnimationManager animationManager;
-    
-    // Cached modular systems (Performance optimization - avoid GetComponent in Enter())
-    [HideInInspector]
-    public BoostSystem boostSystem;
-    [HideInInspector]
-    public BoostInputDetector boostInputDetector;
-    [HideInInspector]
-    public FlightSpeedController flightSpeedController;
-    [HideInInspector]
-    public BirdPathFollower birdPathFollower;
-    [HideInInspector]
-    public DynamicJoystick dynamicJoystick;
-
+    public CharacterInput characterInput;
 
     private void Start()
     {
@@ -94,115 +23,60 @@ public class Character : MonoBehaviour
         if (gameStartManager != null)
         {
             Debug.Log("✓ GameStartManager found - waiting for initialization...");
-            // GameStartManager will enable us when ready
-            // Don't initialize state machine yet
+            // GameStartManager will call InitializeCharacter when ready
             return;
         }
-        
+
         // No GameStartManager - initialize normally (for testing/other scenes)
         InitializeCharacter();
     }
-    
-    /// <summary>
-    /// Initialize the character (called by Start or GameStartManager)
-    /// </summary>
+
     public void InitializeCharacter()
     {
-        // CRITICAL: Ensure EventSystem exists for joystick touch input
-        EnsureEventSystem();
-        
-        // Cache core components
-        rb = GetComponent<Rigidbody>();
-        
-        // Cache modular systems (Performance optimization)
-        boostSystem = GetComponent<BoostSystem>();
-        boostInputDetector = GetComponent<BoostInputDetector>();
-        flightSpeedController = GetComponent<FlightSpeedController>();
-        birdPathFollower = GetComponent<BirdPathFollower>();
-        
-        // Find joystick in scene
-        dynamicJoystick = FindFirstObjectByType<DynamicJoystick>();
-        
-        // Get or assign animation manager
-        if (animationManager == null)
-        {
-            animationManager = GetComponent<BirdAnimationManager>();
-            if (animationManager == null)
-            {
-                Debug.LogWarning("⚠️ BirdAnimationManager not found on Character! Flapping animation won't work.");
-            }
-            else
-            {
-                Debug.Log("✓ BirdAnimationManager found and assigned!");
-            }
-        }
-        
-        // Log what we found
-        Debug.Log($"[Character] Cached components: BoostSystem={boostSystem != null}, InputDetector={boostInputDetector != null}, SpeedController={flightSpeedController != null}, PathFollower={birdPathFollower != null}, Joystick={dynamicJoystick != null}");
+        Debug.Log("[Character] Initializing character...");
 
+        // Get core components
+        pathFollower = GetComponent<CharacterPathFollower>();
+        characterInput = GetComponent<CharacterInput>();
+
+        // Validate components
+        if (pathFollower == null)
+            Debug.LogError("❌ CharacterPathFollower not found on Character!");
+        if (characterInput == null)
+            Debug.LogWarning("⚠️ CharacterInput not found on Character!");
+
+        // Initialize state machine
         movementSM = new StateMachine();
-        
-        // Initialize flying state
-        flyingState = new FlyingState(this, movementSM);
-        
-        // Start with flying state
-        movementSM.Initialize(flyingState);   
+
+        // Create and initialize flying state
+        flyingState = new BirdFlyingState(this, movementSM);
+        movementSM.Initialize(flyingState);
+
+        // Start path following
+        if (pathFollower != null)
+        {
+            pathFollower.StartFollowing();
+        }
+
+        Debug.Log("✅ Character initialized with BirdFlyingState!");
     }
 
     private void Update()
     {
-        movementSM.currentState.HandleInput();
-        movementSM.currentState.LogicUpdate();
-        movementSM.currentState.UpdateAnimation();
-        movementSM.currentState.ChangeState();
+        if (movementSM?.currentState != null)
+        {
+            movementSM.currentState.HandleInput();
+            movementSM.currentState.LogicUpdate();
+            movementSM.currentState.UpdateAnimation();
+            movementSM.currentState.ChangeState();
+        }
     }
 
     private void FixedUpdate()
     {
-        movementSM.currentState.PhysicsUpdate();
-    }
-   
-    /// <summary>
-    /// Ensures an EventSystem exists for joystick touch input (CRITICAL!)
-    /// FIXED: Now uses InputSystemUIInputModule for New Input System
-    /// </summary>
-    private void EnsureEventSystem()
-    {
-        EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
-        
-        if (eventSystem == null)
+        if (movementSM?.currentState != null)
         {
-            Debug.LogWarning("[Character] No EventSystem found! Creating one for joystick touch input...");
-            GameObject eventSystemObj = new GameObject("EventSystem");
-            eventSystemObj.AddComponent<EventSystem>();
-            eventSystemObj.AddComponent<InputSystemUIInputModule>(); // NEW INPUT SYSTEM!
-            DontDestroyOnLoad(eventSystemObj); // Persist across scenes
-            Debug.Log("[Character] EventSystem created with InputSystemUIInputModule!");
-        }
-        else
-        {
-            Debug.Log("[Character] EventSystem found: " + eventSystem.gameObject.name);
-            
-            // ALWAYS remove StandaloneInputModule if it exists
-            StandaloneInputModule oldModule = eventSystem.GetComponent<StandaloneInputModule>();
-            if (oldModule != null)
-            {
-                Debug.LogWarning("[Character] Removing OLD StandaloneInputModule!");
-                DestroyImmediate(oldModule); // Use DestroyImmediate to ensure it's gone NOW
-            }
-            
-            // Add InputSystemUIInputModule if missing
-            InputSystemUIInputModule newModule = eventSystem.GetComponent<InputSystemUIInputModule>();
-            if (newModule == null)
-            {
-                Debug.LogWarning("[Character] Adding InputSystemUIInputModule...");
-                eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
-                Debug.Log("[Character] InputSystemUIInputModule added!");
-            }
-            else
-            {
-                Debug.Log("[Character] InputSystemUIInputModule already present - touch input ready!");
-            }
+            movementSM.currentState.PhysicsUpdate();
         }
     }
 }
