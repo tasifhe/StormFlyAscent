@@ -1,37 +1,23 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.EnhancedTouch;
-using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
-using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 /// <summary>
 /// FlyingState - AC-style bird flight with joystick (left/right, up/down) and tap-to-flap boost
-/// Refactored to use modular systems
+/// Refactored to use modular systems - acts as a coordinator for specialized components
 /// </summary>
 public class FlyingState : State
 {
-    // Input references
-    private DynamicJoystick joystick;
+    // Core systems (from Character)
     private BirdPathFollower pathFollower;
-    
-    // Modular systems
     private BoostSystem boostSystem;
     private BoostInputDetector inputDetector;
     private FlightSpeedController speedController;
     
-    // Input smoothing for AC-style responsiveness
-    private Vector3 smoothedInput = Vector3.zero;
-    private Vector3 inputVelocity = Vector3.zero;
-    
-    // Auto gliding mechanic variables
-    private bool isGliding = false;
-    private float flightTimer = 0f;
-    
-    // Movement tracking
-    private float currentLateralPosition = 0f;
-    private float currentVerticalOffset = 0f;
-    private float lateralVelocity = 0f;
-    private float verticalVelocity = 0f;
+    // Modular flight components
+    private FlightInputHandler inputHandler;
+    private InputSmoother inputSmoother;
+    private LateralMovementController lateralMovement;
+    private VerticalMovementController verticalMovement;
+    private FlightStateManager flightStateManager;
 
     public FlyingState(Character _character, StateMachine _stateMachine) : base(_character, _stateMachine)
     {
@@ -43,14 +29,30 @@ public class FlyingState : State
     {
         base.Enter();
         
-        // Use cached modular systems from Character (Performance optimization)
+        // Get cached systems from Character (Performance optimization)
         boostSystem = character.boostSystem;
         inputDetector = character.boostInputDetector;
         speedController = character.flightSpeedController;
         pathFollower = character.birdPathFollower;
-        joystick = character.dynamicJoystick;
         
         // Validate critical components
+        ValidateComponents();
+        
+        // Initialize modular flight systems
+        InitializeFlightSystems();
+        
+        // Subscribe to boost input
+        if (inputDetector != null)
+        {
+            inputDetector.OnBoostInputDetected += OnBoostInput;
+        }
+    }
+    
+    /// <summary>
+    /// Validate all required components are present
+    /// </summary>
+    private void ValidateComponents()
+    {
         if (boostSystem == null)
             Debug.LogWarning("⚠️ BoostSystem not found on Character!");
         if (inputDetector == null)
@@ -62,94 +64,66 @@ public class FlyingState : State
         else
             Debug.Log($"✓ BirdPathFollower found! Current speed: {pathFollower.followSpeed}");
         
-        if (joystick != null)
+        if (character.dynamicJoystick != null)
             Debug.Log("Joystick found - AC-style controls active");
         else
             Debug.Log("No joystick - using keyboard (WASD/Arrows + Space for boost)");
+    }
+    
+    /// <summary>
+    /// Initialize all modular flight systems
+    /// </summary>
+    private void InitializeFlightSystems()
+    {
+        // Input handling
+        inputHandler = new FlightInputHandler(character.dynamicJoystick);
         
-        // Subscribe to boost input
-        if (inputDetector != null)
-        {
-            inputDetector.OnBoostInputDetected += OnBoostInput;
-        }
+        // Input smoothing
+        inputSmoother = new InputSmoother(character.inputResponsiveness);
         
-        // Start with active flying (not gliding)
-        isGliding = false;
-        flightTimer = 0f;
+        // Lateral movement (left/right)
+        lateralMovement = new LateralMovementController(
+            pathFollower,
+            character.moveSpeed,
+            character.maxLateralDistance,
+            character.inputResponsiveness,
+            character.airDrag
+        );
         
-        // Reset smooth values
-        smoothedInput = Vector3.zero;
-        inputVelocity = Vector3.zero;
-        lateralVelocity = 0f;
-        verticalVelocity = 0f;
+        // Vertical movement (up/down)
+        verticalMovement = new VerticalMovementController(
+            pathFollower,
+            character.verticalSpeed,
+            character.maxVerticalOffset,
+            character.inputResponsiveness,
+            character.airDrag
+        );
         
-        currentLateralPosition = 0f;
-        currentVerticalOffset = 0f;
+        // Flight state management (flying/gliding transitions)
+        flightStateManager = new FlightStateManager(
+            character.flyingDuration,
+            character.glidingDuration
+        );
     }
 
     /// <summary>
-    /// Handle input detection - ALL INPUTS WORK SIMULTANEOUSLY
-    /// Joystick (touch/mouse) + Keyboard + Gamepad all work together
+    /// Handle input detection from all sources (joystick, keyboard, gamepad)
     /// Called in Update()
     /// </summary>
     public override void HandleInput()
     {
         base.HandleInput();
 
-        Vector3 rawInput = Vector3.zero;
-
-        // ===== JOYSTICK INPUT (Works with BOTH touch AND mouse!) =====
-        if (joystick != null)
-        {
-            Vector2 joystickInput = new Vector2(joystick.Horizontal, joystick.Vertical);
-            if (joystickInput.sqrMagnitude > 0.01f)
-            {
-                rawInput = new Vector3(joystickInput.x, joystickInput.y, 0f);
-            }
-        }
+        if (inputHandler == null || inputSmoother == null) return;
         
-        // ===== KEYBOARD INPUT =====
-        if (Keyboard.current != null)
-        {
-            float horizontal = 0f;
-            float vertical = 0f;
-            
-            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) horizontal -= 1f;
-            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) horizontal += 1f;
-            if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vertical += 1f;
-            if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vertical -= 1f;
-            
-            Vector2 keyboardInput = new Vector2(horizontal, vertical);
-            if (keyboardInput.sqrMagnitude > 0.01f)
-            {
-                rawInput += new Vector3(keyboardInput.x, keyboardInput.y, 0f);
-            }
-        }
+        // Get raw input from all sources (handled by FlightInputHandler)
+        Vector3 rawInput = inputHandler.GetRawInput();
         
-        // ===== GAMEPAD INPUT =====
-        if (Gamepad.current != null)
-        {
-            Vector2 stickInput = Gamepad.current.leftStick.ReadValue();
-            if (stickInput.sqrMagnitude > 0.01f)
-            {
-                rawInput += new Vector3(stickInput.x, stickInput.y, 0f);
-            }
-        }
+        // Smooth input for AC-style feel (handled by InputSmoother)
+        Vector3 smoothedInput = inputSmoother.SmoothInput(rawInput);
         
-        // Clamp combined input
-        if (rawInput.sqrMagnitude > 1f)
-        {
-            rawInput = rawInput.normalized;
-        }
-        
-        // ===== SMOOTH INPUT FOR AC-STYLE FEEL =====
-        float smoothTime = 1f / character.inputResponsiveness;
-        smoothedInput = Vector3.SmoothDamp(smoothedInput, rawInput, ref inputVelocity, smoothTime);
-        
-        // Apply smoothed input
+        // Store in character for other systems to access
         character.inputDirection = smoothedInput;
-        
-        // Note: Boost input is now handled by BoostInputDetector
     }
     
     /// <summary>
@@ -171,41 +145,17 @@ public class FlyingState : State
     {
         base.LogicUpdate();
 
+        if (flightStateManager == null) return;
+        
         // ===== AUTO FLYING/GLIDING TRANSITION =====
-        // Don't auto-transition while boost is active
-        if (boostSystem != null && !boostSystem.IsBoosting)
-        {
-            flightTimer += Time.deltaTime;
-            
-            if (isGliding)
-            {
-                // Currently gliding - check if it's time to start flapping again
-                if (flightTimer >= character.glidingDuration)
-                {
-                    isGliding = false;
-                    flightTimer = 0f;
-                    Debug.Log("Switching from Gliding to Flying");
-                }
-            }
-            else
-            {
-                // Currently flying - check if it's time to glide
-                if (flightTimer >= character.flyingDuration)
-                {
-                    isGliding = true;
-                    flightTimer = 0f;
-                    Debug.Log("Switching from Flying to Gliding");
-                }
-            }
-        }
+        // Pause transitions during boost
+        bool shouldPauseTransitions = boostSystem != null && boostSystem.IsBoosting;
+        flightStateManager.UpdateState(shouldPauseTransitions);
         
         // ===== UPDATE SPEED via FlightSpeedController =====
         if (speedController != null)
         {
-            FlightSpeedController.FlightMode mode = isGliding 
-                ? FlightSpeedController.FlightMode.Gliding 
-                : FlightSpeedController.FlightMode.Normal;
-                
+            FlightSpeedController.FlightMode mode = flightStateManager.GetCurrentMode();
             speedController.UpdateSpeed(mode);
         }
     }
@@ -217,8 +167,7 @@ public class FlyingState : State
     }
 
     /// <summary>
-    /// Physics-based movement - AC-style smooth joystick control (left/right + up/down)
-    /// Enhanced with momentum, drag, and flap boost mechanics
+    /// Physics-based movement using modular controllers
     /// Called in FixedUpdate()
     /// </summary>
     public override void PhysicsUpdate()
@@ -226,85 +175,24 @@ public class FlyingState : State
         base.PhysicsUpdate();
 
         // Note: BirdPathFollower (Runner) controls forward movement along the path
-        // We apply lateral (X) and vertical (Y) steering forces, plus boost/lift
+        // Modular controllers handle lateral and vertical steering
 
-        // ===== SMOOTH LATERAL MOVEMENT (LEFT/RIGHT) =====
-        float horizontalInput = character.inputDirection.x;
-        
-        if (Mathf.Abs(horizontalInput) > 0.01f)
+        // ===== LATERAL MOVEMENT (LEFT/RIGHT) =====
+        if (lateralMovement != null)
         {
-            // Calculate desired lateral velocity
-            float targetLateralVelocity = horizontalInput * character.moveSpeed;
-            
-            // Smoothly accelerate towards target velocity
-            lateralVelocity = Mathf.Lerp(lateralVelocity, targetLateralVelocity, Time.fixedDeltaTime * character.inputResponsiveness);
-            
-            // Apply smooth lateral movement
-            currentLateralPosition += lateralVelocity * Time.fixedDeltaTime;
-            currentLateralPosition = Mathf.Clamp(currentLateralPosition, -character.maxLateralDistance, character.maxLateralDistance);
-            
-            // Update path follower lateral offset
-            if (pathFollower != null)
-            {
-                pathFollower.SetLateralOffset(currentLateralPosition);
-            }
-        }
-        else
-        {
-            // No input - apply smooth deceleration using air drag
-            lateralVelocity = Mathf.Lerp(lateralVelocity, 0f, Time.fixedDeltaTime * character.airDrag * 2f);
-            
-            // Continue drifting with remaining momentum
-            currentLateralPosition += lateralVelocity * Time.fixedDeltaTime;
-            currentLateralPosition = Mathf.Clamp(currentLateralPosition, -character.maxLateralDistance, character.maxLateralDistance);
-            
-            if (pathFollower != null)
-            {
-                pathFollower.SetLateralOffset(currentLateralPosition);
-            }
+            float horizontalInput = character.inputDirection.x;
+            lateralMovement.UpdateMovement(horizontalInput);
         }
         
-        // ===== SMOOTH VERTICAL MOVEMENT (UP/DOWN) =====
-        float verticalInput = character.inputDirection.y;
-        
-        if (Mathf.Abs(verticalInput) > 0.01f)
+        // ===== VERTICAL MOVEMENT (UP/DOWN) =====
+        if (verticalMovement != null)
         {
-            // Calculate desired vertical velocity
-            float targetVerticalVelocity = verticalInput * character.verticalSpeed;
-            
-            // Smoothly accelerate towards target velocity
-            verticalVelocity = Mathf.Lerp(verticalVelocity, targetVerticalVelocity, Time.fixedDeltaTime * character.inputResponsiveness);
-            
-            // Apply smooth vertical movement
-            currentVerticalOffset += verticalVelocity * Time.fixedDeltaTime;
-            currentVerticalOffset = Mathf.Clamp(currentVerticalOffset, -character.maxVerticalOffset, character.maxVerticalOffset);
-            
-            // Update path follower vertical offset
-            if (pathFollower != null)
-            {
-                pathFollower.heightOffset = currentVerticalOffset;
-            }
-        }
-        else
-        {
-            // No input - apply smooth deceleration
-            verticalVelocity = Mathf.Lerp(verticalVelocity, 0f, Time.fixedDeltaTime * character.airDrag * 2f);
-            
-            // Continue drifting with remaining momentum
-            currentVerticalOffset += verticalVelocity * Time.fixedDeltaTime;
-            currentVerticalOffset = Mathf.Clamp(currentVerticalOffset, -character.maxVerticalOffset, character.maxVerticalOffset);
-            
-            if (pathFollower != null)
-            {
-                pathFollower.heightOffset = currentVerticalOffset;
-            }
+            float verticalInput = character.inputDirection.y;
+            verticalMovement.UpdateMovement(verticalInput);
         }
 
         // ===== AIR DRAG (AC-STYLE RESISTANCE) =====
-        // Apply gentle drag to all movement for natural deceleration
-        Vector3 dragForce = -character.rb.linearVelocity * character.airDrag;
-        dragForce.z *= 0.1f; // Less drag on forward movement
-        character.rb.AddForce(dragForce, ForceMode.Force);
+        ApplyAirDrag();
 
         // ===== BOOST PHYSICS =====
         if (boostSystem != null)
@@ -313,14 +201,22 @@ public class FlyingState : State
         }
         
         // ===== GLIDING LIFT =====
-        if (isGliding && !boostSystem.IsBoosting)
+        if (flightStateManager != null && flightStateManager.IsGliding && 
+            (boostSystem == null || !boostSystem.IsBoosting))
         {
             // Subtle lift during gliding for realistic flight
             character.rb.AddForce(Vector3.up * 2f, ForceMode.Force);
         }
-
-        // Note: Forward speed boost is handled by BoostSystem
-        // Note: Rotation is handled by BirdPathFollower which aligns bird with path direction
+    }
+    
+    /// <summary>
+    /// Apply gentle air drag for natural deceleration
+    /// </summary>
+    private void ApplyAirDrag()
+    {
+        Vector3 dragForce = -character.rb.linearVelocity * character.airDrag;
+        dragForce.z *= 0.1f; // Less drag on forward movement
+        character.rb.AddForce(dragForce, ForceMode.Force);
     }
 
     /// <summary>
@@ -330,22 +226,21 @@ public class FlyingState : State
     {
         base.UpdateAnimation();
 
-        if (character.animationManager != null)
+        if (character.animationManager == null || flightStateManager == null) return;
+
+        // Boost animation is handled by BoostSystem events
+        // Handle gliding vs flying animations
+        if (boostSystem != null && boostSystem.IsBoosting)
         {
-            // Boost animation is handled by BoostSystem events
-            // Just handle gliding vs flying here
-            if (boostSystem != null && boostSystem.IsBoosting)
-            {
-                // Keep flapping animation during boost - don't override it!
-            }
-            else if (isGliding)
-            {
-                character.animationManager.PlayGliding();
-            }
-            else
-            {
-                character.animationManager.PlayFlying();
-            }
+            // Keep flapping animation during boost - don't override it!
+        }
+        else if (flightStateManager.IsGliding)
+        {
+            character.animationManager.PlayGliding();
+        }
+        else
+        {
+            character.animationManager.PlayFlying();
         }
     }
 

@@ -21,12 +21,68 @@ public class GameStartManager : MonoBehaviour
     private void Awake()
     {
         FindReferences();
+        // Freeze bird until level path is ready
         FreezeBird();
     }
     
     private void Start()
     {
-        StartCoroutine(WaitForLevelGeneratorAndStart());
+        // Wait for level generator to be ready before starting
+        StartCoroutine(WaitForLevelAndStart());
+    }
+    
+    /// <summary>
+    /// Wait for LevelGenerator to create the path before starting bird
+    /// </summary>
+    private IEnumerator WaitForLevelAndStart()
+    {
+        Debug.Log("GameStartManager: Waiting for LevelGenerator to be ready...");
+        
+        float waitStart = Time.time;
+        float maxWaitTime = 5f;
+        
+        // Wait for LevelGenerator instance
+        while (LevelGenerator.instance == null)
+        {
+            if (Time.time - waitStart > maxWaitTime)
+            {
+                Debug.LogWarning("LevelGenerator not found after timeout, starting anyway");
+                break;
+            }
+            yield return null;
+        }
+        
+        // Wait for level to be ready
+        if (LevelGenerator.instance != null)
+        {
+            waitStart = Time.time;
+            while (!LevelGenerator.instance.ready)
+            {
+                if (Time.time - waitStart > maxWaitTime)
+                {
+                    Debug.LogWarning("LevelGenerator not ready after timeout, starting anyway");
+                    break;
+                }
+                yield return null;
+            }
+            
+            Debug.Log("✅ LevelGenerator is ready!");
+        }
+        
+        // Wait for path follower to initialize and project onto path
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+        
+        // Ensure bird is positioned on the path before unfreezing
+        if (birdPathFollower != null && LevelGenerator.instance != null && LevelGenerator.instance.ready)
+        {
+            // Force bird to project onto path in StartMode.Project
+            Debug.Log("Projecting bird onto path...");
+            yield return new WaitForSeconds(0.2f);
+        }
+        
+        // Now start the game
+        StartGame();
     }
     
     /// <summary>
@@ -71,15 +127,20 @@ public class GameStartManager : MonoBehaviour
         
         if (birdCharacter != null)
             birdCharacter.enabled = false;
+        
+        Debug.Log("🧊 Bird frozen, waiting for level...");
     }
     
     /// <summary>
-    /// Unfreeze and start gameplay
+    /// Unfreeze bird and start gameplay
     /// </summary>
     private void UnfreezeBird()
     {
         if (birdCharacter != null)
+        {
+            birdCharacter.enabled = true;
             birdCharacter.InitializeCharacter();
+        }
         
         if (birdRigidbody != null)
         {
@@ -88,9 +149,6 @@ public class GameStartManager : MonoBehaviour
             birdRigidbody.useGravity = true;
         }
         
-        if (birdCharacter != null)
-            birdCharacter.enabled = true;
-        
         // Enable path following
         if (birdPathFollower != null)
         {
@@ -98,30 +156,7 @@ public class GameStartManager : MonoBehaviour
             birdPathFollower.StartFollow();
         }
         
-        // if (showDebugLogs)
-        //     Debug.Log("✅ GameStartManager: Bird unfrozen, gameplay started!");
-    }
-    
-    /// <summary>
-    /// Wait for LevelGenerator to be ready, then start gameplay
-    /// MenuSceneManager already handles the loading screen
-    /// </summary>
-    private IEnumerator WaitForLevelGeneratorAndStart()
-    {
-        // Wait for LevelGenerator to be ready
-        while (LevelGenerator.instance == null || !LevelGenerator.instance.ready)
-        {
-            yield return null;
-        }
-        
-        // if (showDebugLogs)
-        //     Debug.Log("✅ GameStartManager: LevelGenerator is ready - Starting game!");
-        
-        // Small delay to ensure MenuSceneManager finishes its fade
-        yield return new WaitForSeconds(0.2f);
-        
-        // Start the game
-        StartGame();
+        Debug.Log("✅ GameStartManager: Bird unfrozen and started!");
     }
     
     /// <summary>
@@ -137,14 +172,13 @@ public class GameStartManager : MonoBehaviour
         
         hasStarted = true;
         
-        // Unfreeze the bird
+        // Unfreeze and start the bird (level is ready)
         UnfreezeBird();
         
         // Fire event for other systems
         OnGameStarted();
         
-        // if (showDebugLogs)
-        //     Debug.Log("🎮 GAME STARTED!");
+        Debug.Log("🎮 GAME STARTED - Bird on path and ready!");
     }
     
     /// <summary>

@@ -22,9 +22,10 @@ public class MenuSceneManager : MonoBehaviour
     
     [Header("Loading Settings")]
     [SerializeField] private float fadeDuration = 0.5f;
-    [SerializeField] private float minimumLoadingTime = 1.5f; // Minimum time to show loading panel
+    [SerializeField] private float minimumLoadingTime = 2.0f; // Minimum time to show loading panel (increased for proper loading)
     [SerializeField] private float additionalDisplayTime = 0.5f; // Extra time to show panel after loading completes
-    [SerializeField] private bool keepLoadingPanelForLevelGen = true; // Keep panel visible for level generation
+    [SerializeField] private float minimumHoldAtEnd = 0.5f; // Hold at 100% before fading (for visual clarity)
+    [SerializeField] private bool keepLoadingPanelForLevelGen = false; // Keep panel visible for level generation (DISABLED - let level gen happen at runtime)
     
     [Header("Menu References")]
     [SerializeField] private GameObject mainMenuManager; // Reference to MainMenuManager GameObject to hide it
@@ -117,20 +118,12 @@ public class MenuSceneManager : MonoBehaviour
     /// </summary>
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        Debug.Log($"=== OnSceneLoaded: {scene.name}, isLoading={isLoading}, waitingForLevelGen={waitingForLevelGen} ===");
+        Debug.Log($"=== OnSceneLoaded: {scene.name} ===");
         
         // If we loaded the main menu scene, re-cache the menu manager
         if (scene.name == mainMenuSceneName)
         {
             StartCoroutine(CacheMenuManagerDelayed());
-        }
-        
-        // If we're waiting for the game scene to load and this is it, continue loading sequence
-        if (waitingForLevelGen && scene.name == gameSceneName)
-        {
-            Debug.Log("=== Game scene loaded, continuing loading sequence ===");
-            waitingForLevelGen = false;
-            StartCoroutine(ContinueGameSceneLoading());
         }
     }
     
@@ -155,104 +148,6 @@ public class MenuSceneManager : MonoBehaviour
                 Debug.Log("Re-cached MainMenuManager from scene search");
             }
         }
-    }
-    
-    /// <summary>
-    /// Continue loading sequence after game scene loads
-    /// </summary>
-    private IEnumerator ContinueGameSceneLoading()
-    {
-        Debug.Log("=== ContinueGameSceneLoading STARTED ===");
-        
-        // Wait for scene to fully initialize
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForEndOfFrame();
-        
-        // Re-validate loading panel reference
-        if (!ValidateLoadingPanel())
-        {
-            Debug.LogError("Loading panel lost after scene load! Trying to recover...");
-            if (!RecoverLoadingPanelReference())
-            {
-                Debug.LogError("Failed to recover loading panel reference!");
-                isLoading = false;
-                yield break;
-            }
-        }
-        
-        // Ensure Canvas is on top
-        Canvas loadingCanvas = loadingPanel.GetComponentInParent<Canvas>();
-        if (loadingCanvas != null)
-        {
-            loadingCanvas.sortingOrder = 1000;
-            Debug.Log($"Set loading canvas sorting order to {loadingCanvas.sortingOrder}");
-        }
-        
-        // Update progress
-        UpdateLoadingUI(0.6f);
-        if (loadingPercentageText != null)
-            loadingPercentageText.text = "Scene Loaded... 60%";
-        
-        yield return new WaitForSeconds(0.3f);
-        
-        // Now wait for level generator
-        Debug.Log("=== Starting WaitForLevelGenerator from scene loaded event ===");
-        yield return StartCoroutine(WaitForLevelGenerator());
-        
-        Debug.Log("=== ContinueGameSceneLoading COMPLETED ===");
-    }
-    
-    /// <summary>
-    /// Validate that loading panel reference is still valid
-    /// </summary>
-    private bool ValidateLoadingPanel()
-    {
-        if (loadingPanel == null)
-            return false;
-        
-        if (!loadingPanel.activeInHierarchy)
-        {
-            Debug.LogWarning("Loading panel became inactive! Re-activating...");
-            loadingPanel.SetActive(true);
-        }
-        
-        return true;
-    }
-    
-    /// <summary>
-    /// Try to recover loading panel reference if it was lost
-    /// </summary>
-    private bool RecoverLoadingPanelReference()
-    {
-        // Search for loading panel by name
-        GameObject[] allObjects = FindObjectsOfType<GameObject>(true);
-        foreach (GameObject obj in allObjects)
-        {
-            if ((obj.name == "Loading Panel" || obj.name == "Loading Pannel") && obj.scene.name == null)
-            {
-                loadingPanel = obj;
-                Debug.Log($"Recovered loading panel reference: {obj.name}");
-                loadingPanel.SetActive(true);
-                
-                // Also try to recover other references
-                if (loadingProgressBar == null)
-                    loadingProgressBar = loadingPanel.GetComponentInChildren<Slider>();
-                if (loadingPercentageText == null || loadingTipText == null)
-                {
-                    var texts = loadingPanel.GetComponentsInChildren<TMPro.TextMeshProUGUI>();
-                    if (texts.Length > 0 && loadingPercentageText == null)
-                        loadingPercentageText = texts[0];
-                    if (texts.Length > 1 && loadingTipText == null)
-                        loadingTipText = texts[1];
-                }
-                if (fadeImage == null)
-                    fadeImage = loadingPanel.GetComponentInChildren<Image>();
-                
-                return true;
-            }
-        }
-        
-        return false;
     }
     
     #region Public Methods
@@ -326,12 +221,8 @@ public class MenuSceneManager : MonoBehaviour
         // Validate loading panel before starting
         if (loadingPanel == null)
         {
-            Debug.LogError("Loading panel reference is NULL at start! Trying to recover...");
-            if (!RecoverLoadingPanelReference())
-            {
-                Debug.LogError("Cannot start loading without panel reference!");
-                yield break;
-            }
+            Debug.LogError("Loading panel reference is NULL at start!");
+            yield break;
         }
         
         isLoading = true;
@@ -390,12 +281,16 @@ public class MenuSceneManager : MonoBehaviour
         asyncLoad.allowSceneActivation = false;
         
         // Show loading progress (use configured minimum time)
+        // Ensure minimum time is met for smooth loading experience
         while (asyncLoad.progress < 0.9f || (Time.time - loadStartTime) < minimumLoadingTime)
         {
             float progress = asyncLoad.progress / 0.9f;
-            UpdateLoadingUI(progress * 0.5f); // 0-50%
+            float timeProgress = Mathf.Clamp01((Time.time - loadStartTime) / minimumLoadingTime);
+            float displayProgress = Mathf.Max(progress, timeProgress) * 0.5f; // 0-50%
+            
+            UpdateLoadingUI(displayProgress);
             if (loadingPercentageText != null)
-                loadingPercentageText.text = $"Loading... {(int)(progress * 50)}%";
+                loadingPercentageText.text = $"Loading... {(int)(displayProgress * 100)}%";
             yield return null;
         }
         
@@ -406,281 +301,64 @@ public class MenuSceneManager : MonoBehaviour
         
         yield return new WaitForSeconds(0.3f);
         
-        // Check if this is the game scene that needs level generator
-        bool isGameScene = sceneName == gameSceneName;
-        
-        Debug.Log($"Scene activation ready. isGameScene: {isGameScene}, keepLoadingPanelForLevelGen: {keepLoadingPanelForLevelGen}");
-        
-        if (isGameScene && keepLoadingPanelForLevelGen)
-        {
-            Debug.Log("=== Taking GAME SCENE loading path (with LevelGenerator wait) ===");
-            // Show activating
-            UpdateLoadingUI(0.55f);
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = "Activating... 55%";
-            
-            // Set flag so OnSceneLoaded knows to continue the sequence
-            waitingForLevelGen = true;
-            targetSceneName = sceneName;
-            
-            // Activate scene - OnSceneLoaded will continue the loading sequence
-            Debug.Log("Activating game scene, OnSceneLoaded event will continue loading...");
-            asyncLoad.allowSceneActivation = true;
-            
-            // DON'T wait for isDone here - just exit the coroutine
-            // The OnSceneLoaded event will handle the rest
-            Debug.Log("=== LoadSceneAsync complete, waiting for OnSceneLoaded event ===");
-        }
-        else
-        {
-            Debug.Log("=== Taking NORMAL SCENE loading path (simple fade) ===");
-            // Normal scene - just activate
-            UpdateLoadingUI(1f);
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = "Ready!";
-            asyncLoad.allowSceneActivation = true;
-            
-            // Wait for activation
-            while (!asyncLoad.isDone)
-            {
-                yield return null;
-            }
-            
-            // Smooth fade out and hide
-            yield return new WaitForSeconds(0.2f);
-            
-            if (fadeImage != null)
-            {
-                float elapsed = 0f;
-                while (elapsed < fadeDuration)
-                {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / fadeDuration;
-                    t = t * t * (3f - 2f * t); // Smoothstep easing
-                    fadeImage.color = Color.Lerp(new Color(0, 0, 0, 1f), new Color(0, 0, 0, 0f), t);
-                    yield return null;
-                }
-                fadeImage.color = new Color(0, 0, 0, 0f);
-                fadeImage.gameObject.SetActive(false);
-            }
-            
-            HideLoadingPanel();
-            
-            isLoading = false;
-            waitingForLevelGen = false;
-            
-            Debug.Log("=== LoadSceneAsync COMPLETED (normal path) ===");
-        }
-    }
-    
-    /// <summary>
-    /// Wait for level generator to be ready before revealing gameplay
-    /// </summary>
-    private IEnumerator WaitForLevelGenerator()
-    {
-        Debug.Log("=== WaitForLevelGenerator STARTED ===");
+        // Show activating and progressing
         UpdateLoadingUI(0.6f);
         if (loadingPercentageText != null)
-            loadingPercentageText.text = "Initializing... 60%";
-        
-        Debug.Log("Waiting for LevelGenerator and BirdController to be ready...");
-        
-        float totalWaitStart = Time.time;
-        float maxWaitTime = 8f; // Maximum 8 seconds total wait
-        
-        // Wait a frame for scene to settle
-        yield return new WaitForEndOfFrame();
-        
-        // Wait for LevelGenerator instance with shorter timeout
-        float waitStart = Time.time;
-        while (LevelGenerator.instance == null)
-        {
-            // Check if we've exceeded total wait time
-            if (Time.time - totalWaitStart > maxWaitTime)
-            {
-                Debug.LogWarning("Exceeded max wait time, proceeding anyway");
-                break;
-            }
-            
-            if (Time.time - waitStart > 2f)
-            {
-                Debug.LogWarning("LevelGenerator instance not found after 2 seconds, but continuing...");
-                break;
-            }
-            yield return null;
-        }
-        
-        // If no LevelGenerator found, just wait a bit and finish
-        if (LevelGenerator.instance == null)
-        {
-            Debug.LogWarning("No LevelGenerator found - completing loading anyway");
-            
-            UpdateLoadingUI(0.8f);
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = "Almost Ready... 80%";
-            
-            yield return new WaitForSeconds(1f);
-            
-            // Skip to completion
-            yield return StartCoroutine(FinishLoading());
-            yield break;
-        }
-        
-        Debug.Log($"Found LevelGenerator instance, current ready state: {LevelGenerator.instance.ready}");
-        
-        UpdateLoadingUI(0.65f);
-        if (loadingPercentageText != null)
-            loadingPercentageText.text = "Found Level Generator... 65%";
+            loadingPercentageText.text = "Activating... 60%";
         
         yield return new WaitForSeconds(0.2f);
         
-        // Wait for level to be ready with timeout
-        waitStart = Time.time;
-        while (!LevelGenerator.instance.ready)
-        {
-            // Check total elapsed time
-            float totalElapsed = Time.time - totalWaitStart;
-            if (totalElapsed > maxWaitTime)
-            {
-                Debug.LogWarning("Max wait time exceeded, finishing loading");
-                break;
-            }
-            
-            // Show smooth progress 65-80% over max 5 seconds
-            float elapsed = Time.time - waitStart;
-            float progress = 0.65f + (Mathf.Min(elapsed / 5f, 1f) * 0.15f);
-            UpdateLoadingUI(progress);
-            
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = $"Preparing Level... {(int)(progress * 100)}%";
-            
-            yield return null;
-            
-            // Shorter timeout for ready check
-            if (elapsed > 5f)
-            {
-                Debug.LogWarning("LevelGenerator not ready after 5 seconds, proceeding anyway");
-                break;
-            }
-        }
-        
-        Debug.Log("LevelGenerator ready, now waiting for BirdController...");
-        
         UpdateLoadingUI(0.8f);
         if (loadingPercentageText != null)
-            loadingPercentageText.text = "Finding Bird Controller... 80%";
+            loadingPercentageText.text = "Preparing... 80%";
         
-        // Wait for Character (bird) to be ready
-        Character birdCharacter = null;
-        waitStart = Time.time;
-        while (birdCharacter == null)
+        // Activate scene
+        asyncLoad.allowSceneActivation = true;
+        
+        // Wait for activation
+        while (!asyncLoad.isDone)
         {
-            birdCharacter = FindFirstObjectByType<Character>();
-            
-            float totalElapsed = Time.time - totalWaitStart;
-            if (totalElapsed > maxWaitTime)
-            {
-                Debug.LogWarning("Max wait exceeded for Bird Character, finishing anyway");
-                break;
-            }
-            
-            if (Time.time - waitStart > 2f)
-            {
-                Debug.LogWarning("Bird Character not found after 2 seconds, but continuing...");
-                break;
-            }
-            
             yield return null;
         }
         
-        if (birdCharacter != null)
-        {
-            Debug.Log("Found Bird Character, waiting for initialization...");
-            UpdateLoadingUI(0.85f);
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = "Initializing Bird... 85%";
-            
-            // Give bird character a moment to initialize
-            yield return new WaitForSeconds(0.3f);
-            
-            UpdateLoadingUI(0.9f);
-            if (loadingPercentageText != null)
-                loadingPercentageText.text = "Ready to fly... 90%";
-        }
-        else
-        {
-            Debug.LogWarning("Bird Character not found, but proceeding to finish loading");
-        }
+        Debug.Log("Scene activated, showing final progress");
         
-        Debug.Log("Level and Bird ready, finishing loading sequence");
-        
-        // Finish loading sequence
-        Debug.Log("=== Calling FinishLoading ===");
-        yield return StartCoroutine(FinishLoading());
-        Debug.Log("=== WaitForLevelGenerator COMPLETED ===");
-    }
-    
-    /// <summary>
-    /// Complete the loading sequence and reveal gameplay
-    /// </summary>
-    private IEnumerator FinishLoading()
-    {
-        Debug.Log("=== FinishLoading STARTED ===");
-        
-        // Level ready - show completion
-        UpdateLoadingUI(0.95f);
-        if (loadingPercentageText != null)
-            loadingPercentageText.text = "Ready... 95%";
-        
-        Debug.Log("FinishLoading: Showing 95%");
-        
-        yield return new WaitForSeconds(0.3f);
-        
-        Debug.Log("FinishLoading: First wait complete, showing 100%");
+        // Show 100% and hold
         UpdateLoadingUI(1f);
         if (loadingPercentageText != null)
-            loadingPercentageText.text = "Starting... 100%";
+            loadingPercentageText.text = "Ready... 100%";
         
+        // Hold at 100% for minimum time
+        Debug.Log($"Holding at 100% for {minimumHoldAtEnd} seconds...");
+        yield return new WaitForSeconds(minimumHoldAtEnd);
+        
+        // Additional display time
         yield return new WaitForSeconds(additionalDisplayTime);
         
-        Debug.Log("FinishLoading: Second wait complete, starting fade");
+        Debug.Log("Starting fade out...");
         
-        // Smooth fade from black with easing
+        // Smooth fade out and hide
         if (fadeImage != null)
         {
             float elapsed = 0f;
-            Color startColor = new Color(0, 0, 0, 1f);
-            Color targetColor = new Color(0, 0, 0, 0f);
-            
             while (elapsed < fadeDuration)
             {
                 elapsed += Time.deltaTime;
-                if (fadeImage != null)
-                {
-                    // Smoothstep easing for polished fade
-                    float t = Mathf.Clamp01(elapsed / fadeDuration);
-                    t = t * t * (3f - 2f * t);
-                    fadeImage.color = Color.Lerp(startColor, targetColor, t);
-                }
+                float t = elapsed / fadeDuration;
+                t = t * t * (3f - 2f * t); // Smoothstep easing
+                fadeImage.color = Color.Lerp(new Color(0, 0, 0, 1f), new Color(0, 0, 0, 0f), t);
                 yield return null;
             }
-            
-            if (fadeImage != null)
-            {
-                fadeImage.color = targetColor;
-                fadeImage.gameObject.SetActive(false);
-            }
+            fadeImage.color = new Color(0, 0, 0, 0f);
+            fadeImage.gameObject.SetActive(false);
         }
         
-        Debug.Log("FinishLoading: Fade complete, hiding loading panel");
-        
-        // Hide loading panel with multiple attempts
         HideLoadingPanel();
         
         isLoading = false;
         waitingForLevelGen = false;
         
-        Debug.Log("=== FinishLoading COMPLETED - gameplay revealed! ===");
+        Debug.Log("=== LoadSceneAsync COMPLETED - gameplay starts immediately ===");
     }
     
     /// <summary>
