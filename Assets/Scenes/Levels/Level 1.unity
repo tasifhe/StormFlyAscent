@@ -1368,7 +1368,7 @@ MonoBehaviour:
   _startLevel: 0
   _sharedPathGenerator: {fileID: 11400000, guid: 3529cc9903db546449d530fea2dc69de, type: 2}
   levels: []
-  usePathGeneratorInstance: 0
+  usePathGeneratorInstance: 1
 --- !u!4 &617198340
 Transform:
   m_ObjectHideFlags: 0
