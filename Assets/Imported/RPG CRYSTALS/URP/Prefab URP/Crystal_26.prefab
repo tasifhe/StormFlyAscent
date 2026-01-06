@@ -9,6 +9,18 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -48,6 +60,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: -7511558181221131132, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -56,21 +72,25 @@ PrefabInstance:
       propertyPath: m_Name
       value: Crystal_26
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 4260262244147814428}
+      addedObject: {fileID: -3449042195843237642}
   m_SourcePrefab: {fileID: 100100000, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
 --- !u!1 &729728402205522399 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
   m_PrefabInstance: {fileID: 495938896429057166}
   m_PrefabAsset: {fileID: 0}
---- !u!65 &4260262244147814428
-BoxCollider:
+--- !u!64 &-3449042195843237642
+MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -87,6 +107,7 @@ BoxCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.28788146, y: 0.25499016, z: 1.1023462}
-  m_Center: {x: -0.00867416, y: 0.1324105, z: 0.011023015}
+  serializedVersion: 5
+  m_Convex: 1
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -3277912819482562244, guid: 5915bfe5d6358b64a82ba0d896496928, type: 3}
