@@ -10,6 +10,10 @@ using Dreamteck.Splines;
 /// </summary>
 public class ObstacleSpawnerSimple : MonoBehaviour
 {
+    [Header("Master Control")]
+    [Tooltip("Enable/disable automatic obstacle spawning. Disable this if manually placing obstacles in level segments.")]
+    public bool enableAutomaticSpawning = false;
+    
     [System.Serializable]
     public class ObstacleConfig
     {
@@ -105,6 +109,11 @@ public class ObstacleSpawnerSimple : MonoBehaviour
     /// </summary>
     private void OnSegmentCreated(LevelSegment segment)
     {
+        if (!enableAutomaticSpawning)
+        {
+            return;
+        }
+        
         Debug.Log($"[ObstacleSpawnerSimple] Segment created: {segment.name}");
         
         // Start coroutine to wait for segment to be ready

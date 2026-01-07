@@ -49098,37 +49098,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad64e5da13c3d63448ff25e56b0d220b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerSpeed: 5
-  rotationSpeed: 10
-  forwardSpeed: 10
-  moveSpeed: 5
-  verticalSpeed: 3
-  flapBoostForce: 20
-  flapBoostDuration: 0.3
-  flapCooldown: 0.8
-  maxLateralDistance: 5
-  maxVerticalOffset: 5
-  inputResponsiveness: 8
-  flapSpeedMultiplier: 1.8
-  glideSpeedMultiplier: 0.85
-  altitudeSpeedInfluence: 1.5
-  airDrag: 1.2
-  maxTurnRate: 90
-  flyingDuration: 3
-  glidingDuration: 2
-  speedDampTime: 0.1
-  airControl: 0.5
-  gravityValue: -9.81
-  playerVelocity: {x: 0, y: 0, z: 0}
-  isGrounded: 0
   inputDirection: {x: 0, y: 0, z: 0}
-  rb: {fileID: 0}
-  animationManager: {fileID: 0}
-  boostSystem: {fileID: 0}
-  boostInputDetector: {fileID: 0}
-  flightSpeedController: {fileID: 0}
-  birdPathFollower: {fileID: 0}
-  dynamicJoystick: {fileID: 0}
+  pathFollower: {fileID: 0}
+  characterInput: {fileID: 0}
 --- !u!54 &880275951
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -126035,7 +126007,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1850404584
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -126048,9 +126020,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdec8e4f94bca0548b2f60537f77b722, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  birdCharacter: {fileID: 880275945}
-  birdRigidbody: {fileID: 880275951}
-  birdPathFollower: {fileID: 880275953}
+  character: {fileID: 0}
   maxWaitTime: 10
 --- !u!4 &1850404585
 Transform:

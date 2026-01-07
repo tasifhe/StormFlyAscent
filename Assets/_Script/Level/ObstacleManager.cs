@@ -42,6 +42,11 @@ public class ObstacleManager : MonoBehaviour
         Instance = this;
     }
     
+    private void Start()
+    {
+        Debug.Log("[ObstacleManager] ✓ Initialized and ready!");
+    }
+    
     /// <summary>
     /// Called when player passes through an obstacle
     /// </summary>

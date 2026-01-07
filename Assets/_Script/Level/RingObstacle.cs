@@ -30,24 +30,48 @@ public class RingObstacle : ObstacleBase
         }
     }
     
+    // Override to prevent base class from triggering immediately
+    protected override void OnTriggerEnter(Collider other)
+    {
+        if (hasBeenTriggered) return;
+        
+        // Check for player by tag or name (more flexible)
+        if (other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player"))
+        {
+            Debug.Log($"[RingObstacle] Player ENTERED trigger: {other.gameObject.name}");
+            playerIsInsideRing = true;
+            entryPosition = other.transform.position;
+        }
+    }
+    
     private void OnTriggerStay(Collider other)
     {
-        if (other.CompareTag("Player") && !hasBeenTriggered)
+        // Just ensure we track that player is inside
+        if ((other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player")) && !hasBeenTriggered)
         {
-            playerIsInsideRing = true;
-            if (entryPosition == Vector3.zero)
+            if (!playerIsInsideRing)
             {
-                entryPosition = other.transform.position;
+                Debug.Log($"[RingObstacle] Player is STAYING in ring: {other.gameObject.name}");
+                playerIsInsideRing = true;
+                if (entryPosition == Vector3.zero)
+                {
+                    entryPosition = other.transform.position;
+                }
             }
         }
     }
     
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Player") && playerIsInsideRing && !hasBeenTriggered)
+        if ((other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player")))
         {
-            hasBeenTriggered = true;
-            CheckRingAccuracy(other.transform.position);
+            Debug.Log($"[RingObstacle] Player EXITED ring: {other.gameObject.name}, playerIsInsideRing={playerIsInsideRing}, hasBeenTriggered={hasBeenTriggered}");
+            
+            if (playerIsInsideRing && !hasBeenTriggered)
+            {
+                hasBeenTriggered = true;
+                CheckRingAccuracy(other.transform.position);
+            }
         }
     }
     
@@ -61,23 +85,60 @@ public class RingObstacle : ObstacleBase
     /// </summary>
     private void CheckRingAccuracy(Vector3 exitPosition)
     {
+        Debug.Log($"[RingObstacle] === CheckRingAccuracy START ===");
+        Debug.Log($"[RingObstacle] Entry Position: {entryPosition}");
+        Debug.Log($"[RingObstacle] Exit Position: {exitPosition}");
+        Debug.Log($"[RingObstacle] Ring Center: {ringCenter.position}");
+        
         // Calculate how close to center the player flew
         Vector3 centerPoint = (entryPosition + exitPosition) / 2f;
         float distanceFromCenter = Vector3.Distance(centerPoint, ringCenter.position);
         
-        // Compare to ring radius (assuming uniform scale)
-        float ringRadius = transform.localScale.x / 2f;
+        // Get actual collider radius instead of transform scale
+        var collider = GetComponent<Collider>();
+        float ringRadius = 5f; // Default fallback
+        
+        if (collider is SphereCollider sphere)
+        {
+            ringRadius = sphere.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
+        }
+        else if (collider is BoxCollider box)
+        {
+            ringRadius = Mathf.Max(box.size.x * transform.lossyScale.x, box.size.y * transform.lossyScale.y) / 2f;
+        }
+        else if (collider is CapsuleCollider capsule)
+        {
+            ringRadius = capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
+        }
+        else
+        {
+            // Fallback to transform scale
+            ringRadius = Mathf.Max(transform.lossyScale.x, transform.lossyScale.y) / 2f;
+        }
+        
         float accuracyScore = 1f - Mathf.Clamp01(distanceFromCenter / ringRadius);
         
-        if (accuracyScore >= accuracyThreshold)
+        Debug.Log($"[RingObstacle] Distance from center: {distanceFromCenter:F2}");
+        Debug.Log($"[RingObstacle] Ring radius: {ringRadius:F2}");
+        Debug.Log($"[RingObstacle] Accuracy score: {accuracyScore:F2}");
+        Debug.Log($"[RingObstacle] Threshold: {accuracyThreshold:F2}");
+        
+        // TEMPORARY: Always succeed to test if scoring works
+        bool forceSuccess = true; // Set to false once scoring is confirmed working
+        
+        if (forceSuccess || accuracyScore >= accuracyThreshold)
         {
+            Debug.Log($"[RingObstacle] ✓✓✓ SUCCESS! Calling OnSuccess() ✓✓✓");
             OnSuccess();
             PlaySuccessEffect();
         }
         else
         {
+            Debug.Log($"[RingObstacle] ✗✗✗ FAILED! Calling OnFail() ✗✗✗");
             OnFail();
         }
+        
+        Debug.Log($"[RingObstacle] === CheckRingAccuracy END ===");
     }
     
     private void PlaySuccessEffect()

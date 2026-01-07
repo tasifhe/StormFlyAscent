@@ -23,7 +23,7 @@ MonoBehaviour:
       segments:
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: b311a08f2dc6440469fb5b4ac1c8cfc7, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}
@@ -40,13 +40,13 @@ MonoBehaviour:
       segments:
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: b311a08f2dc6440469fb5b4ac1c8cfc7, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: fdd983f20dada6a4fa380561e298e8da, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}
@@ -69,7 +69,7 @@ MonoBehaviour:
       segments:
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: b311a08f2dc6440469fb5b4ac1c8cfc7, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}
@@ -86,13 +86,13 @@ MonoBehaviour:
       segments:
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: b311a08f2dc6440469fb5b4ac1c8cfc7, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}
       - nested: 0
         randomPickChance: 1
-        _prefab: {fileID: 7418617847481579727, guid: 967825fb9d155a04da5794983f499a4a, type: 3}
+        _prefab: {fileID: 8202552451982545828, guid: fdd983f20dada6a4fa380561e298e8da, type: 3}
         _segmentPool: []
         _pool: 0
         _poolParent: {fileID: 0}

@@ -30,6 +30,29 @@ public abstract class ObstacleBase : MonoBehaviour
         obstacleRenderer = GetComponentInChildren<Renderer>();
     }
     
+    protected virtual void Start()
+    {
+        // Verify setup
+        var colliders = GetComponentsInChildren<Collider>();
+        int triggerCount = 0;
+        foreach (var col in colliders)
+        {
+            if (col.isTrigger) triggerCount++;
+        }
+        
+        Debug.Log($"[ObstacleBase] {gameObject.name} initialized - Triggers: {triggerCount}, ObstacleManager: {ObstacleManager.Instance != null}");
+        
+        if (triggerCount == 0)
+        {
+            Debug.LogError($"[ObstacleBase] {gameObject.name} has NO TRIGGER COLLIDERS! Add a collider and check 'Is Trigger'");
+        }
+        
+        if (ObstacleManager.Instance == null)
+        {
+            Debug.LogError("[ObstacleBase] ObstacleManager.Instance is NULL! Add ObstacleManager to your scene!");
+        }
+    }
+    
     /// <summary>
     /// Called when player enters the obstacle trigger
     /// </summary>
@@ -37,10 +60,16 @@ public abstract class ObstacleBase : MonoBehaviour
     {
         if (hasBeenTriggered) return;
         
-        if (other.CompareTag("Player"))
+        // Check for player by tag or name (more flexible)
+        if (other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player"))
         {
+            Debug.Log($"[ObstacleBase] Detected player collision: {other.gameObject.name} (Tag: {other.tag})");
             hasBeenTriggered = true;
             HandlePlayerInteraction(other.gameObject);
+        }
+        else
+        {
+            Debug.Log($"[ObstacleBase] Collision with non-player: {other.gameObject.name} (Tag: {other.tag})");
         }
     }
     
@@ -54,6 +83,8 @@ public abstract class ObstacleBase : MonoBehaviour
     /// </summary>
     protected virtual void OnSuccess()
     {
+        Debug.Log($"[ObstacleBase] ✓ OnSuccess() called for {gameObject.name}");
+        
         if (successMaterial != null && obstacleRenderer != null)
         {
             obstacleRenderer.material = successMaterial;
@@ -65,7 +96,15 @@ public abstract class ObstacleBase : MonoBehaviour
         }
         
         // Notify scoring system
-        ObstacleManager.Instance?.OnObstaclePassed(this, true);
+        if (ObstacleManager.Instance != null)
+        {
+            Debug.Log($"[ObstacleBase] Notifying ObstacleManager about success (+{pointValue} points)");
+            ObstacleManager.Instance.OnObstaclePassed(this, true);
+        }
+        else
+        {
+            Debug.LogError("[ObstacleBase] Cannot notify ObstacleManager - Instance is NULL!");
+        }
     }
     
     /// <summary>
@@ -73,6 +112,8 @@ public abstract class ObstacleBase : MonoBehaviour
     /// </summary>
     protected virtual void OnFail()
     {
+        Debug.Log($"[ObstacleBase] ✗ OnFail() called for {gameObject.name}");
+        
         if (failMaterial != null && obstacleRenderer != null)
         {
             obstacleRenderer.material = failMaterial;
@@ -84,7 +125,10 @@ public abstract class ObstacleBase : MonoBehaviour
         }
         
         // Notify scoring system
-        ObstacleManager.Instance?.OnObstaclePassed(this, false);
+        if (ObstacleManager.Instance != null)
+        {
+            ObstacleManager.Instance.OnObstaclePassed(this, false);
+        }
     }
     
     /// <summary>

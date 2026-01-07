@@ -121,8 +121,9 @@ GameObject:
   - component: {fileID: 4308839606547152814}
   - component: {fileID: 5392812719668587868}
   - component: {fileID: 4786085496923979940}
+  - component: {fileID: 4241281653615033321}
   m_Layer: 0
-  m_Name: RingObstacle
+  m_Name: RingObstacle_Static
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -164,7 +165,7 @@ MonoBehaviour:
   failMaterial: {fileID: 2100000, guid: 655e867d1513ff64a9084ad027bdf6bd, type: 2}
   successSound: {fileID: 0}
   failSound: {fileID: 0}
-  accuracyThreshold: 0.7
+  accuracyThreshold: 0.2
   ringCenter: {fileID: 8412039787780105560}
   successParticles: {fileID: 0}
   ringGlow: {fileID: 0}
@@ -204,8 +205,23 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 12.153015, y: 12.307, z: 2.4097037}
-  m_Center: {x: -0.0035715103, y: -0.044053555, z: 0.029368639}
+  m_Size: {x: 12, y: 12, z: 3.5}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &4241281653615033321
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6277141774750336493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60610f3c0f1b8964db16499f8217b409, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  logAllCollisions: 1
+  drawDebugGizmos: 1
+  gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &6920727078390843645
 GameObject:
   m_ObjectHideFlags: 0
