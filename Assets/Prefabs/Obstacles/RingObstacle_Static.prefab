@@ -163,9 +163,9 @@ MonoBehaviour:
   normalMaterial: {fileID: 2100000, guid: 552e364db6f489f41bbd820cdf96f3cc, type: 2}
   successMaterial: {fileID: 2100000, guid: 06f0775a43f98ea44ae1e9c1edeb235a, type: 2}
   failMaterial: {fileID: 2100000, guid: 655e867d1513ff64a9084ad027bdf6bd, type: 2}
-  successSound: {fileID: 0}
+  successSound: {fileID: 8300000, guid: ffb159a21c8a04135a5616979c828fab, type: 3}
   failSound: {fileID: 0}
-  accuracyThreshold: 0.2
+  accuracyThreshold: 0.3
   ringCenter: {fileID: 8412039787780105560}
   successParticles: {fileID: 0}
   ringGlow: {fileID: 0}

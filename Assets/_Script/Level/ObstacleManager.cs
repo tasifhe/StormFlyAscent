@@ -17,6 +17,7 @@ public class ObstacleManager : MonoBehaviour
     [Header("Events")]
     public System.Action<int> OnScoreChanged;
     public System.Action<ObstacleBase, bool> OnObstacleInteraction;
+    public System.Action OnGameOver;
     
     [Header("Combo System")]
     [Tooltip("Enable combo multiplier for consecutive successes")]
@@ -27,6 +28,13 @@ public class ObstacleManager : MonoBehaviour
     
     [Tooltip("Maximum combo multiplier")]
     public float maxComboMultiplier = 5f;
+    
+    [Header("Game Over System")]
+    [Tooltip("Maximum allowed failures before game over")]
+    public int maxFailures = 3;
+    
+    [Tooltip("Enable game over system")]
+    public bool useGameOverSystem = true;
     
     private int consecutiveSuccesses = 0;
     private float currentComboMultiplier = 1f;
@@ -96,7 +104,42 @@ public class ObstacleManager : MonoBehaviour
         consecutiveSuccesses = 0;
         currentComboMultiplier = 1f;
         
-        Debug.Log($"✗ Obstacle missed!");
+        Debug.Log($"✗ Obstacle missed! ({failedPasses}/{maxFailures} failures)");
+        
+        // Check for game over
+        if (useGameOverSystem && failedPasses >= maxFailures)
+        {
+            TriggerGameOver();
+        }
+    }
+    
+    private void TriggerGameOver()
+    {
+        Debug.Log("[ObstacleManager] GAME OVER!");
+        OnGameOver?.Invoke();
+        
+        // Pause the game
+        Time.timeScale = 0f;
+    }
+    
+    /// <summary>
+    /// Public method to restart the game
+    /// </summary>
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+        );
+    }
+    
+    /// <summary>
+    /// Public method to go to main menu
+    /// </summary>
+    public void LoadMainMenu(string mainMenuSceneName = "MainMenu")
+    {
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(mainMenuSceneName);
     }
     
     private void AddScore(int points)

@@ -36,11 +36,23 @@ public class RingObstacle : ObstacleBase
         if (hasBeenTriggered) return;
         
         // Check for player by tag or name (more flexible)
-        if (other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player"))
+        // Also check parent in case the collider is on a child object
+        GameObject checkObject = other.gameObject;
+        Transform parent = other.transform.parent;
+        
+        bool isPlayer = checkObject.CompareTag("Player") || 
+                       checkObject.name.Contains("Bird") || 
+                       checkObject.name.Contains("Player") ||
+                       (parent != null && (parent.CompareTag("Player") || parent.name.Contains("Bird") || parent.name.Contains("Player")));
+        
+        if (isPlayer)
         {
-            Debug.Log($"[RingObstacle] Player ENTERED trigger: {other.gameObject.name}");
+            // Use parent position if it exists and has the Player tag, otherwise use the collider object position
+            Transform playerTransform = (parent != null && (parent.CompareTag("Player") || parent.name.Contains("Bird"))) ? parent : other.transform;
+            
+            Debug.Log($"[RingObstacle] Player ENTERED trigger: {other.gameObject.name} (parent: {parent?.name ?? "none"})");
             playerIsInsideRing = true;
-            entryPosition = other.transform.position;
+            entryPosition = playerTransform.position;
         }
     }
     
@@ -63,14 +75,26 @@ public class RingObstacle : ObstacleBase
     
     private void OnTriggerExit(Collider other)
     {
-        if ((other.CompareTag("Player") || other.gameObject.name.Contains("Bird") || other.gameObject.name.Contains("Player")))
+        // Check for player by tag or name, including parent
+        GameObject checkObject = other.gameObject;
+        Transform parent = other.transform.parent;
+        
+        bool isPlayer = checkObject.CompareTag("Player") || 
+                       checkObject.name.Contains("Bird") || 
+                       checkObject.name.Contains("Player") ||
+                       (parent != null && (parent.CompareTag("Player") || parent.name.Contains("Bird") || parent.name.Contains("Player")));
+        
+        if (isPlayer)
         {
+            // Use parent position if it exists and has the Player tag
+            Transform playerTransform = (parent != null && (parent.CompareTag("Player") || parent.name.Contains("Bird"))) ? parent : other.transform;
+            
             Debug.Log($"[RingObstacle] Player EXITED ring: {other.gameObject.name}, playerIsInsideRing={playerIsInsideRing}, hasBeenTriggered={hasBeenTriggered}");
             
             if (playerIsInsideRing && !hasBeenTriggered)
             {
                 hasBeenTriggered = true;
-                CheckRingAccuracy(other.transform.position);
+                CheckRingAccuracy(playerTransform.position);
             }
         }
     }
@@ -123,10 +147,7 @@ public class RingObstacle : ObstacleBase
         Debug.Log($"[RingObstacle] Accuracy score: {accuracyScore:F2}");
         Debug.Log($"[RingObstacle] Threshold: {accuracyThreshold:F2}");
         
-        // TEMPORARY: Always succeed to test if scoring works
-        bool forceSuccess = true; // Set to false once scoring is confirmed working
-        
-        if (forceSuccess || accuracyScore >= accuracyThreshold)
+        if (accuracyScore >= accuracyThreshold)
         {
             Debug.Log($"[RingObstacle] ✓✓✓ SUCCESS! Calling OnSuccess() ✓✓✓");
             OnSuccess();
