@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6324864348211255840}
   - component: {fileID: 613118766121444865}
   - component: {fileID: 1701600224188903338}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Object_10
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -164,8 +164,8 @@ MonoBehaviour:
   successMaterial: {fileID: 2100000, guid: 06f0775a43f98ea44ae1e9c1edeb235a, type: 2}
   failMaterial: {fileID: 2100000, guid: 655e867d1513ff64a9084ad027bdf6bd, type: 2}
   successSound: {fileID: 8300000, guid: ffb159a21c8a04135a5616979c828fab, type: 3}
-  failSound: {fileID: 0}
-  accuracyThreshold: 0.3
+  failSound: {fileID: 8300000, guid: 4b4dd7245f6104c8c8eb07ccf6b386ed, type: 3}
+  accuracyThreshold: 0.4
   ringCenter: {fileID: 8412039787780105560}
   successParticles: {fileID: 0}
   ringGlow: {fileID: 0}
@@ -231,6 +231,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8368225251753521}
+  - component: {fileID: 1745370268233138732}
   m_Layer: 0
   m_Name: Obstacle_01
   m_TagString: Untagged
@@ -255,6 +256,27 @@ Transform:
   - {fileID: 4334846242458559456}
   m_Father: {fileID: 8593512403720442565}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+--- !u!135 &1745370268233138732
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6920727078390843645}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 7.5
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7599927597525095842
 GameObject:
   m_ObjectHideFlags: 0
@@ -267,7 +289,7 @@ GameObject:
   - component: {fileID: 7931157780453949279}
   - component: {fileID: 1072423138664010742}
   - component: {fileID: 4864917163250763210}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Object_12
   m_TagString: Untagged
   m_Icon: {fileID: 0}
