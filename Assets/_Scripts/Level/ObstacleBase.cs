@@ -110,6 +110,12 @@ public abstract class ObstacleBase : MonoBehaviour
     {
         Debug.Log($"[ObstacleBase] ✗ OnFail() called for {gameObject.name}");
 
+        // **TRIGGER IMPACT FEEDBACK** - Camera shake, haptics, visual effects
+        if (ImpactFeedbackManager.Instance != null)
+        {
+            ImpactFeedbackManager.Instance.TriggerMediumImpact(transform.position);
+        }
+
         if (failMaterial != null && obstacleRenderer != null)
         {
             obstacleRenderer.material = failMaterial;
