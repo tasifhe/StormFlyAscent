@@ -13,31 +13,31 @@ public class PauseMenuManager : MonoBehaviour
 {
     [Header("Menu Panels")]
     [SerializeField] private GameObject pauseMenuPanel;
-    
+
     [Header("Buttons")]
     [SerializeField] private Button openPauseButton; // Button on HUD to pause game
     [SerializeField] private Button closeButton; // X button inside menu to resume
     [SerializeField] private Button mainMenuButton;
-    
+
     [Header("Settings Controls")]
-    [SerializeField] private Toggle gyroControlToggle;
+    [SerializeField] private ImageToggle gyroControlToggle;
     [SerializeField] private Slider soundFxSlider;
     [SerializeField] private Slider musicSlider;
-    [SerializeField] private Toggle vibrationToggle;
-    
+    [SerializeField] private ImageToggle vibrationToggle;
+
     [Header("Animation Settings")]
     [SerializeField] private float panelFadeDuration = 0.3f;
     [SerializeField] private float panelScaleDuration = 0.4f;
     [SerializeField] private Ease panelEaseIn = Ease.OutBack;
     [SerializeField] private Ease panelEaseOut = Ease.InBack;
-    
+
     [Header("Blur Effect (Optional)")]
     [SerializeField] private GameObject blurBackground;
-    
+
     private bool isPaused = false;
     private MenuSceneManager sceneManager;
     private SettingsManager settingsManager;
-    
+
     private void Awake()
     {
         // Get references
@@ -47,17 +47,17 @@ public class PauseMenuManager : MonoBehaviour
             sceneManager = FindFirstObjectByType<MenuSceneManager>();
         }
         settingsManager = FindFirstObjectByType<SettingsManager>();
-        
+
         // Setup button listeners
         if (openPauseButton != null)
             openPauseButton.onClick.AddListener(PauseGame);
-            
+
         if (closeButton != null)
             closeButton.onClick.AddListener(ResumeGame);
-            
+
         if (mainMenuButton != null)
             mainMenuButton.onClick.AddListener(ReturnToMainMenu);
-            
+
         // Setup settings controls
         if (gyroControlToggle != null)
             gyroControlToggle.onValueChanged.AddListener(OnGyroControlToggled);
@@ -68,7 +68,7 @@ public class PauseMenuManager : MonoBehaviour
         if (vibrationToggle != null)
             vibrationToggle.onValueChanged.AddListener(OnVibrationToggled);
     }
-    
+
     private void Start()
     {
         // Hide pause menu initially
@@ -76,11 +76,11 @@ public class PauseMenuManager : MonoBehaviour
             pauseMenuPanel.SetActive(false);
         if (blurBackground != null)
             blurBackground.SetActive(false);
-        
+
         // Load saved settings
         LoadSettings();
     }
-    
+
     private void Update()
     {
         // Listen for Escape key or Android back button
@@ -106,40 +106,40 @@ public class PauseMenuManager : MonoBehaviour
             }
         }
     }
-    
+
     /// <summary>
     /// Pause the game and show pause menu
     /// </summary>
     public void PauseGame()
     {
         if (isPaused) return;
-        
+
         isPaused = true;
         Time.timeScale = 0f; // Freeze game
-        
+
         // Show pause menu with animation
         if (pauseMenuPanel != null)
         {
             pauseMenuPanel.SetActive(true);
-            
+
             // Blur background
             if (blurBackground != null)
                 blurBackground.SetActive(true);
-            
+
             // Get or Add CanvasGroup
             CanvasGroup canvasGroup = pauseMenuPanel.GetComponent<CanvasGroup>();
             if (canvasGroup == null)
                 canvasGroup = pauseMenuPanel.AddComponent<CanvasGroup>();
-            
+
             // Allow interaction
             canvasGroup.blocksRaycasts = true;
             canvasGroup.interactable = true;
-                
+
             // Reset state for animation
             // FORCE ALPHA TO 1 FIRST to ensure visibility if tween fails
-            canvasGroup.alpha = 1f; 
+            canvasGroup.alpha = 1f;
             pauseMenuPanel.transform.localScale = Vector3.one;
-            
+
             // Kill any old tweens to prevent conflicts
             DOTween.Kill(canvasGroup);
             DOTween.Kill(pauseMenuPanel.transform);
@@ -151,34 +151,37 @@ public class PauseMenuManager : MonoBehaviour
                 .From(Vector3.one * 0.8f)
                 .SetEase(panelEaseIn)
                 .SetUpdate(true);
+
+            // Refresh settings in case they changed elsewhere
+            LoadSettings();
         }
         else
         {
             Debug.LogError("[PauseMenuManager] Pause Menu Panel is not assigned in the Inspector!");
         }
-        
+
         Debug.Log("Game Paused");
     }
-    
+
     /// <summary>
     /// Resume the game and hide pause menu
     /// </summary>
     public void ResumeGame()
     {
         if (!isPaused) return;
-        
+
         isPaused = false;
         Time.timeScale = 1f; // Resume game immediately for smooth exit
-        
+
         // Animate panel exit
         if (pauseMenuPanel != null)
         {
             CanvasGroup canvasGroup = pauseMenuPanel.GetComponent<CanvasGroup>();
-            
+
             // Kill old tweens
             DOTween.Kill(canvasGroup);
             DOTween.Kill(pauseMenuPanel.transform);
-            
+
             if (canvasGroup != null)
             {
                 canvasGroup.blocksRaycasts = false; // Prevent clicks while fading
@@ -195,13 +198,13 @@ public class PauseMenuManager : MonoBehaviour
                 if (blurBackground != null)
                     blurBackground.SetActive(false);
             }
-            
+
             pauseMenuPanel.transform.DOScale(Vector3.one * 0.8f, panelScaleDuration).SetEase(panelEaseOut).SetUpdate(true);
         }
-        
+
         Debug.Log("Game Resumed");
     }
-    
+
     /// <summary>
     /// Return to main menu
     /// </summary>
@@ -210,7 +213,7 @@ public class PauseMenuManager : MonoBehaviour
         // Resume time before loading
         Time.timeScale = 1f;
         isPaused = false;
-        
+
         // Load main menu scene
         if (sceneManager != null)
         {
@@ -222,9 +225,9 @@ public class PauseMenuManager : MonoBehaviour
             SceneManager.LoadScene(0); // Fallback
         }
     }
-    
+
     #region Settings
-    
+
     private void LoadSettings()
     {
         if (settingsManager != null)
@@ -235,9 +238,9 @@ public class PauseMenuManager : MonoBehaviour
             if (soundFxSlider != null)
                 soundFxSlider.value = settingsManager.GetSFXVolume();
             if (vibrationToggle != null)
-                vibrationToggle.isOn = SettingsManager.IsVibrationEnabled();
+                vibrationToggle.SetValue(SettingsManager.IsVibrationEnabled());
             if (gyroControlToggle != null)
-                gyroControlToggle.isOn = PlayerPrefs.GetInt("GyroControl", 0) == 1;
+                gyroControlToggle.SetValue(SettingsManager.IsGyroControlEnabled());
         }
         else
         {
@@ -247,12 +250,12 @@ public class PauseMenuManager : MonoBehaviour
             if (soundFxSlider != null)
                 soundFxSlider.value = PlayerPrefs.GetFloat("SFXVolume", 0.8f);
             if (vibrationToggle != null)
-                vibrationToggle.isOn = PlayerPrefs.GetInt("Vibration", 1) == 1;
+                vibrationToggle.SetValue(PlayerPrefs.GetInt("Vibration", 1) == 1);
             if (gyroControlToggle != null)
-                gyroControlToggle.isOn = PlayerPrefs.GetInt("GyroControl", 0) == 1;
+                gyroControlToggle.SetValue(PlayerPrefs.GetInt("GyroControl", 0) == 1);
         }
     }
-    
+
     private void OnMusicVolumeChanged(float value)
     {
         if (settingsManager != null)
@@ -265,7 +268,7 @@ public class PauseMenuManager : MonoBehaviour
             // Apply volume to audio source if available
         }
     }
-    
+
     private void OnSFXVolumeChanged(float value)
     {
         if (settingsManager != null)
@@ -277,7 +280,7 @@ public class PauseMenuManager : MonoBehaviour
             PlayerPrefs.SetFloat("SFXVolume", value);
         }
     }
-    
+
     private void OnVibrationToggled(bool enabled)
     {
         if (settingsManager != null)
@@ -289,16 +292,25 @@ public class PauseMenuManager : MonoBehaviour
             PlayerPrefs.SetInt("Vibration", enabled ? 1 : 0);
         }
     }
-    
+
     private void OnGyroControlToggled(bool enabled)
     {
         PlayerPrefs.SetInt("GyroControl", enabled ? 1 : 0);
         PlayerPrefs.Save();
+
+        // Enable/disable gyro immediately if system supports it
+#if UNITY_ANDROID || UNITY_IOS
+        if (SystemInfo.supportsGyroscope)
+        {
+            Input.gyro.enabled = enabled;
+        }
+#endif
+
         Debug.Log($"Gyro Control: {(enabled ? "Enabled" : "Disabled")}");
     }
-    
+
     #endregion
-    
+
     private void OnDestroy()
     {
         // Clean up DOTween animations

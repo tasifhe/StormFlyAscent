@@ -82,7 +82,7 @@ public class ImageToggle : MonoBehaviour
             handle.anchoredPosition = Vector2.Lerp(
                 handle.anchoredPosition,
                 targetPosition,
-                Time.deltaTime * slideSpeed
+                Time.unscaledDeltaTime * slideSpeed
             );
 
             // Stop when close enough
