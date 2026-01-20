@@ -10260,7 +10260,7 @@ MonoBehaviour:
   invertYToggle: {fileID: 0}
   vibrationToggle: {fileID: 0}
   gyroControlToggle: {fileID: 1041256305}
-  vibrationImageToggle: {fileID: 0}
+  vibrationImageToggle: {fileID: 2143782024}
   advancedSettingsPanel: {fileID: 850736808}
   advancedSettingsButton: {fileID: 0}
   advancedSettingsCloseButton: {fileID: 0}

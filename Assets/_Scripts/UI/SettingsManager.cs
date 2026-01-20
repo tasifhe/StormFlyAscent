@@ -87,6 +87,12 @@ public class SettingsManager : MonoBehaviour
 
     private void Start()
     {
+        // Enforce 60 FPS for smooth gameplay
+        Application.targetFrameRate = 60;
+
+        // Disable VSync to allow targetFrameRate to work (especially on mobile)
+        QualitySettings.vSyncCount = 0;
+
         LoadSettings();
         PopulateQualityDropdown();
     }
@@ -377,7 +383,8 @@ public class SettingsManager : MonoBehaviour
     /// </summary>
     public static bool IsGyroControlEnabled()
     {
-        return PlayerPrefs.GetInt(GYRO_CONTROL_KEY, 0) == 1;
+        // Default to 1 (ON) so users don't think it's broken
+        return PlayerPrefs.GetInt(GYRO_CONTROL_KEY, 1) == 1;
     }
 
     #endregion
