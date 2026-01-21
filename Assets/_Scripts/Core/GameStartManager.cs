@@ -38,11 +38,32 @@ public class GameStartManager : MonoBehaviour
             countdownController = FindFirstObjectByType<CountdownController>();
         }
 
-        // Disable character until countdown is complete (if character exists)
+        // Disable ALL character components to prevent ANY movement
         if (character != null)
         {
+            // Disable Character script
             character.enabled = false;
-            Debug.Log("[GameStartManager] Character disabled until game starts");
+
+            // Disable Path Follower (Movement)
+            var follower = character.GetComponent<CharacterPathFollower>();
+            if (follower != null)
+            {
+                follower.enabled = false;
+                Debug.Log("[GameStartManager] Disabled CharacterPathFollower");
+            }
+
+            // Disable Input
+            var input = character.GetComponent<CharacterInput>();
+            if (input != null)
+            {
+                input.enabled = false;
+                Debug.Log("[GameStartManager] Disabled CharacterInput");
+            }
+
+            // Disable Animation (Optional, keeps it in T-pose if disabled, maybe keep enabled for idle?)
+            // Keeping animation enabled usually looks better (idle loop)
+
+            Debug.Log("[GameStartManager] Character components disabled until game starts");
         }
     }
 
@@ -83,8 +104,8 @@ public class GameStartManager : MonoBehaviour
             }
         }
 
-        // Single frame to ensure everything is set up
-        yield return new WaitForEndOfFrame();
+        // Single frame to ensure everything is initialized
+        yield return null;
 
         // Game is already paused from Awake - start countdown immediately
         Debug.Log("[GameStartManager] Level ready, starting countdown");
@@ -122,6 +143,15 @@ public class GameStartManager : MonoBehaviour
         // Enable and initialize character (if it exists)
         if (character != null)
         {
+            // Enable Path Follower first
+            var follower = character.GetComponent<CharacterPathFollower>();
+            if (follower != null) follower.enabled = true;
+
+            // Enable Input
+            var input = character.GetComponent<CharacterInput>();
+            if (input != null) input.enabled = true;
+
+            // Finally enable Character and Initialize
             character.enabled = true;
             character.InitializeCharacter();
             Debug.Log("[GameStartManager] ✅ Character started!");
