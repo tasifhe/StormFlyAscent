@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Audio;
+using DG.Tweening;
 
 /// <summary>
 /// Manages game settings (audio, graphics, controls)
@@ -46,8 +47,13 @@ public class SettingsManager : MonoBehaviour
 
     private MainMenuManager mainMenuManager;
 
+    public static SettingsManager Instance { get; private set; }
+
     private void Awake()
     {
+        if (Instance == null) Instance = this;
+        // Allows multiple settings managers if one is destroyed later or just use first one found
+
         mainMenuManager = FindFirstObjectByType<MainMenuManager>();
 
         // Setup listeners
@@ -153,20 +159,29 @@ public class SettingsManager : MonoBehaviour
 
     private void ApplyAudioSettings()
     {
+        float musicVolume = PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, 0.8f);
+        float sfxVolume = PlayerPrefs.GetFloat(SFX_VOLUME_KEY, 1f);
+
+        // Update AudioManager if available
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.SetMusicVolume(musicVolume);
+            AudioManager.Instance.SetSFXVolume(sfxVolume);
+        }
+
         // If using AudioMixer
         if (audioMixer != null)
         {
-            float musicVolume = PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, 0.8f);
-            float sfxVolume = PlayerPrefs.GetFloat(SFX_VOLUME_KEY, 1f);
-
             audioMixer.SetFloat("MusicVolume", Mathf.Log10(Mathf.Max(musicVolume, 0.0001f)) * 20);
             audioMixer.SetFloat("SFXVolume", Mathf.Log10(Mathf.Max(sfxVolume, 0.0001f)) * 20);
         }
         else
         {
-            // Fallback to AudioListener if no mixer
-            float musicVolume = PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, 0.8f);
-            AudioListener.volume = musicVolume;
+            // Fallback to AudioListener ONLY if AudioManager is not present to avoid double attenuation
+            if (AudioManager.Instance == null)
+            {
+                AudioListener.volume = musicVolume;
+            }
         }
     }
 
@@ -339,6 +354,22 @@ public class SettingsManager : MonoBehaviour
         if (advancedSettingsPanel != null)
         {
             advancedSettingsPanel.SetActive(true);
+
+            // Animate panel entrance with DOTween
+            RectTransform panelRect = advancedSettingsPanel.GetComponent<RectTransform>();
+            CanvasGroup canvasGroup = advancedSettingsPanel.GetComponent<CanvasGroup>();
+
+            if (canvasGroup == null)
+                canvasGroup = advancedSettingsPanel.AddComponent<CanvasGroup>();
+
+            // Start from invisible and slightly scaled down
+            panelRect.localScale = Vector3.one * 0.9f;
+            canvasGroup.alpha = 0f;
+
+            // Animate to visible
+            panelRect.DOScale(1f, 0.25f).SetEase(DG.Tweening.Ease.OutBack).SetUpdate(true);
+            canvasGroup.DOFade(1f, 0.2f).SetUpdate(true);
+
             Debug.Log("Advanced Settings opened");
         }
     }
@@ -350,7 +381,17 @@ public class SettingsManager : MonoBehaviour
     {
         if (advancedSettingsPanel != null)
         {
-            advancedSettingsPanel.SetActive(false);
+            RectTransform panelRect = advancedSettingsPanel.GetComponent<RectTransform>();
+            CanvasGroup canvasGroup = advancedSettingsPanel.GetComponent<CanvasGroup>();
+
+            if (canvasGroup == null)
+                canvasGroup = advancedSettingsPanel.AddComponent<CanvasGroup>();
+
+            // Animate out
+            panelRect.DOScale(0.9f, 0.2f).SetEase(DG.Tweening.Ease.InBack).SetUpdate(true);
+            canvasGroup.DOFade(0f, 0.15f).SetUpdate(true)
+                .OnComplete(() => advancedSettingsPanel.SetActive(false));
+
             Debug.Log("Advanced Settings closed");
         }
     }

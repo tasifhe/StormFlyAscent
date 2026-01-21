@@ -9,6 +9,7 @@ public class GameStartManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Character character;
+    [SerializeField] private CountdownController countdownController;
 
     [Header("Settings")]
     [SerializeField] private float maxWaitTime = 5f;
@@ -17,20 +18,32 @@ public class GameStartManager : MonoBehaviour
 
     private void Awake()
     {
-        // Auto-find character
+        // PAUSE THE GAME IMMEDIATELY - before anything can move
+        Time.timeScale = 0f;
+        Debug.Log("[GameStartManager] Game paused immediately on scene load");
+
+        // Auto-find character (OPTIONAL - game can work without it)
         if (character == null)
         {
             character = FindFirstObjectByType<Character>();
             if (character == null)
             {
-                Debug.LogError("GameStartManager: Character not found!");
-                enabled = false;
-                return;
+                Debug.LogWarning("[GameStartManager] Character component not found - continuing without it");
             }
         }
 
-        // Disable character until level is ready
-        character.enabled = false;
+        // Auto-find countdown controller
+        if (countdownController == null)
+        {
+            countdownController = FindFirstObjectByType<CountdownController>();
+        }
+
+        // Disable character until countdown is complete (if character exists)
+        if (character != null)
+        {
+            character.enabled = false;
+            Debug.Log("[GameStartManager] Character disabled until game starts");
+        }
     }
 
     private void Start()
@@ -40,7 +53,7 @@ public class GameStartManager : MonoBehaviour
 
     private IEnumerator WaitForLevelAndStart()
     {
-        Debug.Log("GameStartManager: Waiting for level...");
+        Debug.Log("[GameStartManager] Waiting for level...");
 
         float waitStart = Time.time;
 
@@ -49,7 +62,7 @@ public class GameStartManager : MonoBehaviour
         {
             if (Time.time - waitStart > maxWaitTime)
             {
-                Debug.LogWarning("LevelGenerator timeout, starting anyway");
+                Debug.LogWarning("[GameStartManager] LevelGenerator timeout, starting anyway");
                 break;
             }
             yield return null;
@@ -63,17 +76,41 @@ public class GameStartManager : MonoBehaviour
             {
                 if (Time.time - waitStart > maxWaitTime)
                 {
-                    Debug.LogWarning("Level not ready, starting anyway");
+                    Debug.LogWarning("[GameStartManager] Level not ready, starting anyway");
                     break;
                 }
                 yield return null;
             }
         }
 
-        // Extra frame to ensure everything is set up
+        // Single frame to ensure everything is set up
         yield return new WaitForEndOfFrame();
 
-        // Start the game
+        // Game is already paused from Awake - start countdown immediately
+        Debug.Log("[GameStartManager] Level ready, starting countdown");
+
+        // Start countdown if available, otherwise start game directly
+        if (countdownController != null)
+        {
+            countdownController.OnCountdownComplete += OnCountdownFinished;
+            countdownController.StartCountdown();
+        }
+        else
+        {
+            Debug.LogWarning("[GameStartManager] CountdownController not found, starting game directly");
+            Time.timeScale = 1f; // Resume if no countdown
+            StartGame();
+        }
+    }
+
+    private void OnCountdownFinished()
+    {
+        // Unsubscribe from event
+        if (countdownController != null)
+        {
+            countdownController.OnCountdownComplete -= OnCountdownFinished;
+        }
+
         StartGame();
     }
 
@@ -82,15 +119,19 @@ public class GameStartManager : MonoBehaviour
         if (hasStarted) return;
         hasStarted = true;
 
-        // Enable and initialize character
+        // Enable and initialize character (if it exists)
         if (character != null)
         {
             character.enabled = true;
             character.InitializeCharacter();
-            Debug.Log("✅ Character started!");
+            Debug.Log("[GameStartManager] ✅ Character started!");
+        }
+        else
+        {
+            Debug.Log("[GameStartManager] ✅ Game started (no Character component)");
         }
 
-        Debug.Log("✅ Game started!");
+        Debug.Log("[GameStartManager] ✅ Game started!");
     }
 
     public bool HasStarted => hasStarted;

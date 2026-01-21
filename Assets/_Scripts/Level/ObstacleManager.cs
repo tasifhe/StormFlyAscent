@@ -142,7 +142,11 @@ public class ObstacleManager : MonoBehaviour
     /// </summary>
     public void RestartGame()
     {
+        // Reset time scale first
         Time.timeScale = 1f;
+
+        // Reset stats before reloading
+        ResetStats();
 
         // Use MenuSceneManager for reloading if available, otherwise fallback
         MenuSceneManager menuManager = MenuSceneManager.Instance;
@@ -157,6 +161,8 @@ public class ObstacleManager : MonoBehaviour
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
             );
         }
+
+        // Note: Countdown will automatically trigger when the scene reloads via GameStartManager
     }
 
     /// <summary>
